@@ -1,6 +1,7 @@
 namespace AutonomousSoftwareFactory.Workflow;
 
 using System.Diagnostics;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using AutonomousSoftwareFactory.Agents;
 using AutonomousSoftwareFactory.Logging;
@@ -19,6 +20,9 @@ public partial class WorkflowEngine : IWorkflowEngine
     private readonly IStateStore _stateStore;
     private readonly ILogger<WorkflowEngine> _logger;
     private readonly IRunLogger _runLogger;
+    private readonly string? _checkpointDirectory;
+
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     public WorkflowEngine(
         WorkflowDefinition workflow,
@@ -29,7 +33,8 @@ public partial class WorkflowEngine : IWorkflowEngine
         IAgentExecutor agentExecutor,
         IStateStore stateStore,
         ILogger<WorkflowEngine> logger,
-        IRunLogger? runLogger = null)
+        IRunLogger? runLogger = null,
+        string? checkpointDirectory = null)
     {
         _workflow = workflow;
         _agents = agents;
@@ -40,9 +45,35 @@ public partial class WorkflowEngine : IWorkflowEngine
         _stateStore = stateStore;
         _logger = logger;
         _runLogger = runLogger ?? NullRunLogger.Instance;
+        _checkpointDirectory = checkpointDirectory;
     }
 
-    public async Task<ExecutionResult> ExecuteAsync(ExecutionContext context, CancellationToken ct)
+    public Task<ExecutionResult> ExecuteAsync(ExecutionContext context, CancellationToken ct)
+        => ExecuteInternalAsync(context, new HashSet<string>(), ct);
+
+    public async Task<ExecutionResult> ResumeAsync(string checkpointPath, CancellationToken ct)
+    {
+        var json = await File.ReadAllTextAsync(checkpointPath, ct);
+        var checkpoint = JsonSerializer.Deserialize<CheckpointData>(json, JsonOptions)
+            ?? throw new InvalidOperationException("Invalid checkpoint file");
+
+        // Restore state store from checkpoint
+        foreach (var (key, value) in checkpoint.StateData)
+            _stateStore.Set(key, value);
+
+        var context = new ExecutionContext
+        {
+            Inputs = checkpoint.Inputs
+        };
+
+        _logger.LogInformation("Resuming workflow '{Name}' from checkpoint. Completed steps: {Steps}",
+            _workflow.Name, string.Join(", ", checkpoint.CompletedSteps));
+
+        return await ExecuteInternalAsync(context, checkpoint.CompletedSteps.ToHashSet(), ct);
+    }
+
+    private async Task<ExecutionResult> ExecuteInternalAsync(
+        ExecutionContext context, HashSet<string> completedSteps, CancellationToken ct)
     {
         var stopwatch = Stopwatch.StartNew();
         var result = new ExecutionResult { Status = "running" };
@@ -65,6 +96,14 @@ public partial class WorkflowEngine : IWorkflowEngine
                 break;
             }
 
+            // Skip steps already completed in a previous run (checkpoint resume)
+            if (completedSteps.Contains(step.Id))
+            {
+                _logger.LogInformation("Skipping already completed step '{StepId}'", step.Id);
+                currentStepId = step.Next;
+                continue;
+            }
+
             context.CurrentStep = step.Id;
             var stepSuccess = await ExecuteStepWithRetryAsync(step, context, result, ct);
 
@@ -76,11 +115,20 @@ public partial class WorkflowEngine : IWorkflowEngine
                     _logger.LogError("Workflow stopped at step '{StepId}': {Message}",
                         step.Id, step.OnFailure?.Message ?? "Step failed");
                     result.Status = "failed";
+
+                    // Save checkpoint on failure so execution can be resumed
+                    await SaveCheckpointAsync(context, completedSteps);
                     break;
                 }
 
                 _logger.LogWarning("Step '{StepId}' failed but workflow continues: {Message}",
                     step.Id, step.OnFailure?.Message ?? "Continuing after failure");
+            }
+
+            if (stepSuccess)
+            {
+                completedSteps.Add(step.Id);
+                await SaveCheckpointAsync(context, completedSteps);
             }
 
             currentStepId = step.Next;
@@ -97,6 +145,30 @@ public partial class WorkflowEngine : IWorkflowEngine
         _runLogger.LogWorkflowEnd(_workflow.Name, result.Status, result.Duration);
 
         return result;
+    }
+
+    private async Task SaveCheckpointAsync(ExecutionContext context, HashSet<string> completedSteps)
+    {
+        if (_checkpointDirectory is null) return;
+
+        Directory.CreateDirectory(_checkpointDirectory);
+
+        var checkpoint = new CheckpointData
+        {
+            WorkflowName = _workflow.Name,
+            CompletedSteps = completedSteps.ToList(),
+            LastCompletedStep = completedSteps.LastOrDefault(),
+            Inputs = context.Inputs,
+            StateData = _stateStore.GetAll(),
+            Timestamp = DateTime.UtcNow
+        };
+
+        var filePath = Path.Combine(_checkpointDirectory, $"{_workflow.Name}-checkpoint.json");
+        var json = JsonSerializer.Serialize(checkpoint, JsonOptions);
+        await File.WriteAllTextAsync(filePath, json);
+
+        _logger.LogInformation("Checkpoint saved after step '{StepId}' to {Path}",
+            checkpoint.LastCompletedStep, filePath);
     }
 
     private async Task<bool> ExecuteStepWithRetryAsync(

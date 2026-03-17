@@ -56,39 +56,35 @@ var logPath = configuration["Execution:LogPath"] ?? "./logs";
 var runLogger = new FileRunLogger(logPath, workflow.Name);
 services.AddSingleton<IRunLogger>(runLogger);
 
-services.AddSingleton<IWorkflowEngine, WorkflowEngine>();
+// 3.6. Checkpoint directory
+var checkpointPath = configuration["Execution:CheckpointPath"] ?? "./workspace/checkpoints";
+services.AddSingleton<IWorkflowEngine>(sp => new WorkflowEngine(
+    sp.GetRequiredService<WorkflowDefinition>(),
+    sp.GetRequiredService<List<AgentDefinition>>(),
+    sp.GetRequiredService<List<SkillDefinition>>(),
+    sp.GetRequiredService<List<ToolDefinition>>(),
+    sp.GetRequiredService<List<PromptDefinition>>(),
+    sp.GetRequiredService<IAgentExecutor>(),
+    sp.GetRequiredService<IStateStore>(),
+    sp.GetRequiredService<ILogger<WorkflowEngine>>(),
+    sp.GetRequiredService<IRunLogger>(),
+    checkpointPath));
 
 var serviceProvider = services.BuildServiceProvider();
 
-// 4. Parse --requirement argument
-var requirementPath = ParseRequirementArg(args);
-if (requirementPath is null)
+// 4. Parse arguments
+var requirementPath = ParseArg(args, "--requirement");
+var resumePath = ParseArg(args, "--resume");
+
+if (requirementPath is null && resumePath is null)
 {
     Console.Error.WriteLine("Usage: AutonomousSoftwareFactory --requirement <path-to-requirement.json>");
+    Console.Error.WriteLine("       AutonomousSoftwareFactory --resume <path-to-checkpoint.json>");
     return 1;
 }
 
-if (!File.Exists(requirementPath))
-{
-    Console.Error.WriteLine($"Requirement file not found: {requirementPath}");
-    return 1;
-}
-
-// 5. Create ExecutionContext with inputs from requirement JSON
-var requirementJson = File.ReadAllText(requirementPath);
-var requirementData = JsonSerializer.Deserialize<Dictionary<string, object>>(requirementJson)
-    ?? new Dictionary<string, object>();
-
-var context = new AutonomousSoftwareFactory.Models.ExecutionContext
-{
-    Inputs = requirementData
-};
-
-// 6. Execute workflow
 var engine = serviceProvider.GetRequiredService<IWorkflowEngine>();
 var logger = serviceProvider.GetRequiredService<ILogger<Program>>();
-
-logger.LogInformation("Starting workflow execution...");
 
 using var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) =>
@@ -97,7 +93,41 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-var result = await engine.ExecuteAsync(context, cts.Token);
+ExecutionResult result;
+
+if (resumePath is not null)
+{
+    // Resume from checkpoint
+    if (!File.Exists(resumePath))
+    {
+        Console.Error.WriteLine($"Checkpoint file not found: {resumePath}");
+        return 1;
+    }
+
+    logger.LogInformation("Resuming workflow from checkpoint: {Path}", resumePath);
+    result = await engine.ResumeAsync(resumePath, cts.Token);
+}
+else
+{
+    // Normal execution
+    if (!File.Exists(requirementPath))
+    {
+        Console.Error.WriteLine($"Requirement file not found: {requirementPath}");
+        return 1;
+    }
+
+    var requirementJson = File.ReadAllText(requirementPath!);
+    var requirementData = JsonSerializer.Deserialize<Dictionary<string, object>>(requirementJson)
+        ?? new Dictionary<string, object>();
+
+    var context = new AutonomousSoftwareFactory.Models.ExecutionContext
+    {
+        Inputs = requirementData
+    };
+
+    logger.LogInformation("Starting workflow execution...");
+    result = await engine.ExecuteAsync(context, cts.Token);
+}
 
 // Dispose run logger to flush all entries
 runLogger.Dispose();
@@ -125,11 +155,11 @@ if (result.Errors.Count > 0)
 
 return result.Status == "completed" ? 0 : 1;
 
-static string? ParseRequirementArg(string[] args)
+static string? ParseArg(string[] args, string flag)
 {
     for (var i = 0; i < args.Length - 1; i++)
     {
-        if (args[i] == "--requirement")
+        if (args[i] == flag)
             return args[i + 1];
     }
 

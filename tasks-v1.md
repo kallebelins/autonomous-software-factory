@@ -199,9 +199,9 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 4.2 Checkpoints e recuperação
 
-- [ ] Implementar persistência de checkpoints (salvar state em arquivo após cada step)
-- [ ] Implementar retomada de execução a partir de checkpoint
-- [ ] Teste: interromper execução no step 5 e retomar do checkpoint
+- [x] Implementar persistência de checkpoints (salvar state em arquivo após cada step)
+- [x] Implementar retomada de execução a partir de checkpoint
+- [x] Teste: interromper execução no step 5 e retomar do checkpoint
 
 ### 4.3 Scripts de automação
 
