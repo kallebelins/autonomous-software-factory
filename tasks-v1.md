@@ -165,10 +165,10 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 3.2 Build e Testes por stack
 
-- [ ] ToolExecutor: `dotnet_build` / `dotnet_test` / `dotnet_restore`
-- [ ] ToolExecutor: `maven_build` / `junit_test` / `maven_install`
-- [ ] ToolExecutor: `npm_build` / `jest_test` / `npm_install`
-- [ ] ToolExecutor: `eslint` / `dotnet_format` / `checkstyle`
+- [x] ToolExecutor: `dotnet_build` / `dotnet_test` / `dotnet_restore`
+- [x] ToolExecutor: `maven_build` / `junit_test` / `maven_install`
+- [x] ToolExecutor: `npm_build` / `jest_test` / `npm_install`
+- [x] ToolExecutor: `eslint` / `dotnet_format` / `checkstyle`
 
 ### 3.3 Logs de execução
 

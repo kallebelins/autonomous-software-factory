@@ -424,6 +424,198 @@ public class ToolExecutorTests : IDisposable
         Assert.Null(resolved);
     }
 
+    // ───────────────────────────── build: dotnet ────────────────────────
+
+    [Fact]
+    public async Task DotnetBuild_Success_ReturnsZeroExitCode()
+    {
+        var result = await ExecuteBuildCommand("dotnet_build", "build",
+            OperatingSystem.IsWindows() ? "echo Build succeeded." : "echo 'Build succeeded.'");
+
+        Assert.True(result.Success);
+        Assert.Contains("Build succeeded", result.Output["stdout"]?.ToString());
+    }
+
+    [Fact]
+    public async Task DotnetBuild_Failure_ReturnsFalse()
+    {
+        var result = await ExecuteBuildCommand("dotnet_build", "build",
+            OperatingSystem.IsWindows() ? "echo Build FAILED. 1>&2 & exit /b 1" : "echo 'Build FAILED.' >&2; exit 1");
+
+        Assert.False(result.Success);
+        Assert.NotEmpty(result.Errors);
+    }
+
+    [Fact]
+    public async Task DotnetRestore_Success_ReturnsTrue()
+    {
+        var result = await ExecuteBuildCommand("dotnet_restore", "dependency",
+            OperatingSystem.IsWindows() ? "echo Restore completed." : "echo 'Restore completed.'");
+
+        Assert.True(result.Success);
+    }
+
+    [Fact]
+    public async Task DotnetTest_ParsesTestCounts()
+    {
+        // Simulate dotnet test output
+        var cmd = OperatingSystem.IsWindows()
+            ? "echo Passed!  - Failed:     0, Passed:     5, Skipped:     0, Total:     5"
+            : "echo 'Passed!  - Failed:     0, Passed:     5, Skipped:     0, Total:     5'";
+
+        var result = await ExecuteBuildCommand("dotnet_test", "test", cmd);
+
+        Assert.True(result.Success);
+        Assert.Equal(5, result.Output["total"]);
+        Assert.Equal(5, result.Output["passed"]);
+        Assert.Equal(0, result.Output["failed"]);
+    }
+
+    [Fact]
+    public async Task DotnetTest_WithFailures_ParsesCounts()
+    {
+        var cmd = OperatingSystem.IsWindows()
+            ? "echo Failed!  - Failed:     2, Passed:     3, Skipped:     0, Total:     5 & exit /b 1"
+            : "echo 'Failed!  - Failed:     2, Passed:     3, Skipped:     0, Total:     5'; exit 1";
+
+        var result = await ExecuteBuildCommand("dotnet_test", "test", cmd);
+
+        Assert.False(result.Success);
+        Assert.Equal(5, result.Output["total"]);
+        Assert.Equal(3, result.Output["passed"]);
+        Assert.Equal(2, result.Output["failed"]);
+    }
+
+    // ───────────────────────────── build: maven ───────────────────────
+
+    [Fact]
+    public async Task MavenBuild_Success_ReturnsZeroExitCode()
+    {
+        var result = await ExecuteBuildCommand("maven_build", "build",
+            OperatingSystem.IsWindows() ? "echo BUILD SUCCESS" : "echo 'BUILD SUCCESS'");
+
+        Assert.True(result.Success);
+        Assert.Contains("BUILD SUCCESS", result.Output["stdout"]?.ToString());
+    }
+
+    [Fact]
+    public async Task JunitTest_ParsesTestCounts()
+    {
+        var cmd = OperatingSystem.IsWindows()
+            ? "echo Tests run: 10, Failures: 1, Errors: 0, Skipped: 2"
+            : "echo 'Tests run: 10, Failures: 1, Errors: 0, Skipped: 2'";
+
+        var result = await ExecuteBuildCommand("junit_test", "test", cmd);
+
+        Assert.True(result.Success);
+        Assert.Equal(10, result.Output["total"]);
+        Assert.Equal(9, result.Output["passed"]);
+        Assert.Equal(1, result.Output["failed"]);
+    }
+
+    [Fact]
+    public async Task MavenInstall_Success_ReturnsTrue()
+    {
+        var result = await ExecuteBuildCommand("maven_install", "dependency",
+            OperatingSystem.IsWindows() ? "echo BUILD SUCCESS" : "echo 'BUILD SUCCESS'");
+
+        Assert.True(result.Success);
+    }
+
+    // ───────────────────────────── build: npm ─────────────────────────
+
+    [Fact]
+    public async Task NpmBuild_Success_ReturnsZeroExitCode()
+    {
+        var result = await ExecuteBuildCommand("npm_build", "build",
+            OperatingSystem.IsWindows() ? "echo compiled successfully" : "echo 'compiled successfully'");
+
+        Assert.True(result.Success);
+    }
+
+    [Fact]
+    public async Task JestTest_ParsesTestCounts()
+    {
+        var cmd = OperatingSystem.IsWindows()
+            ? "echo Tests:       1 failed, 3 passed, 4 total"
+            : "echo 'Tests:       1 failed, 3 passed, 4 total'";
+
+        var result = await ExecuteBuildCommand("jest_test", "test", cmd);
+
+        Assert.True(result.Success);
+        Assert.Equal(4, result.Output["total"]);
+        Assert.Equal(3, result.Output["passed"]);
+        Assert.Equal(1, result.Output["failed"]);
+    }
+
+    [Fact]
+    public async Task JestTest_AllPassed_ParsesCorrectly()
+    {
+        var cmd = OperatingSystem.IsWindows()
+            ? "echo Tests:       5 passed, 5 total"
+            : "echo 'Tests:       5 passed, 5 total'";
+
+        var result = await ExecuteBuildCommand("jest_test", "test", cmd);
+
+        Assert.True(result.Success);
+        Assert.Equal(5, result.Output["total"]);
+        Assert.Equal(5, result.Output["passed"]);
+        Assert.Equal(0, result.Output["failed"]);
+    }
+
+    [Fact]
+    public async Task NpmInstall_Success_ReturnsTrue()
+    {
+        var result = await ExecuteBuildCommand("npm_install", "dependency",
+            OperatingSystem.IsWindows() ? "echo added 100 packages" : "echo 'added 100 packages'");
+
+        Assert.True(result.Success);
+    }
+
+    // ───────────────────────────── quality / lint ──────────────────────
+
+    [Fact]
+    public async Task DotnetFormat_Success_NoIssues()
+    {
+        var result = await ExecuteBuildCommand("dotnet_format", "quality",
+            OperatingSystem.IsWindows() ? "echo Format complete." : "echo 'Format complete.'");
+
+        Assert.True(result.Success);
+        var issues = result.Output["issues"] as List<string>;
+        Assert.NotNull(issues);
+        Assert.Empty(issues);
+    }
+
+    [Fact]
+    public async Task Eslint_WithProblems_ParsesOutput()
+    {
+        var cmd = OperatingSystem.IsWindows()
+            ? "echo 5 problems (3 errors, 2 warnings)"
+            : "echo '5 problems (3 errors, 2 warnings)'";
+
+        var result = await ExecuteBuildCommand("eslint", "quality", cmd);
+
+        Assert.True(result.Success);
+        var issues = result.Output["issues"] as List<string>;
+        Assert.NotNull(issues);
+        Assert.NotEmpty(issues);
+    }
+
+    [Fact]
+    public async Task Checkstyle_WithErrors_ParsesOutput()
+    {
+        var cmd = OperatingSystem.IsWindows()
+            ? "echo [ERROR] src/Main.java:10: Missing Javadoc"
+            : "echo '[ERROR] src/Main.java:10: Missing Javadoc'";
+
+        var result = await ExecuteBuildCommand("checkstyle", "quality", cmd);
+
+        Assert.True(result.Success);
+        var issues = result.Output["issues"] as List<string>;
+        Assert.NotNull(issues);
+        Assert.NotEmpty(issues);
+    }
+
     // ───────────────────────────── git: helper methods ───────────────
 
     [Theory]
@@ -722,6 +914,26 @@ public class ToolExecutorTests : IDisposable
         {
             Tool = tool,
             Inputs = inputs,
+            WorkingDirectory = _tempWorkspace
+        };
+
+        return _executor.ExecuteAsync(request, CancellationToken.None);
+    }
+
+    private Task<ToolResult> ExecuteBuildCommand(string toolName, string category, string commandOverride)
+    {
+        var tool = new ToolDefinition
+        {
+            Name = toolName,
+            Category = category,
+            ExecutionType = "command",
+            Command = commandOverride
+        };
+
+        var request = new ToolExecutionRequest
+        {
+            Tool = tool,
+            Inputs = new(),
             WorkingDirectory = _tempWorkspace
         };
 

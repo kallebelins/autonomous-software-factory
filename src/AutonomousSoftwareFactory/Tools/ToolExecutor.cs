@@ -139,8 +139,179 @@ public partial class ToolExecutor : IToolExecutor
         if (tool.Name == "git_clone" && result.Success)
             result.Output["local_path"] = inputs.GetValueOrDefault("destination", "").Trim('"');
 
+        // Build/test/lint output enrichment
+        EnrichCommandOutput(tool, result);
+
         return result;
     }
+
+    // ───────────────────────────── output enrichment ───────────────────
+
+    private static void EnrichCommandOutput(ToolDefinition tool, ToolResult result)
+    {
+        var stdoutStr = result.Output.TryGetValue("stdout", out var stdout) ? stdout?.ToString() ?? "" : "";
+        var stderrStr = result.Output.TryGetValue("stderr", out var stderr) ? stderr?.ToString() ?? "" : "";
+        var combined = stdoutStr + "\n" + stderrStr;
+
+        switch (tool.Category)
+        {
+            case "test":
+                EnrichTestOutput(tool.Name, combined, result);
+                break;
+            case "quality":
+                EnrichQualityOutput(tool.Name, combined, result);
+                break;
+        }
+    }
+
+    private static void EnrichTestOutput(string toolName, string output, ToolResult result)
+    {
+        switch (toolName)
+        {
+            case "dotnet_test":
+                ParseDotnetTestOutput(output, result);
+                break;
+            case "junit_test":
+                ParseMavenTestOutput(output, result);
+                break;
+            case "jest_test":
+                ParseJestTestOutput(output, result);
+                break;
+        }
+    }
+
+    private static void ParseDotnetTestOutput(string output, ToolResult result)
+    {
+        // Pattern: "Total: 10, Passed: 8, Failed: 2"  or  "Passed! - Failed: 0, Passed: 5, Skipped: 0, Total: 5"
+        var match = DotnetTestTotalRegex().Match(output);
+        if (match.Success)
+        {
+            if (int.TryParse(match.Groups["total"].Value, out var total))
+                result.Output["total"] = total;
+            if (int.TryParse(match.Groups["passed"].Value, out var passed))
+                result.Output["passed"] = passed;
+            if (int.TryParse(match.Groups["failed"].Value, out var failed))
+                result.Output["failed"] = failed;
+        }
+    }
+
+    private static void ParseMavenTestOutput(string output, ToolResult result)
+    {
+        // Pattern: "Tests run: 10, Failures: 2, Errors: 1, Skipped: 0"
+        var match = MavenTestRegex().Match(output);
+        if (match.Success)
+        {
+            if (int.TryParse(match.Groups["run"].Value, out var run))
+                result.Output["total"] = run;
+            if (int.TryParse(match.Groups["failures"].Value, out var failures)
+                && int.TryParse(match.Groups["errors"].Value, out var errors))
+            {
+                result.Output["failed"] = failures + errors;
+                result.Output["passed"] = run - failures - errors;
+            }
+        }
+    }
+
+    private static void ParseJestTestOutput(string output, ToolResult result)
+    {
+        // Pattern: "Tests:       2 passed, 2 total"  or  "Tests:       1 failed, 3 passed, 4 total"
+        var match = JestTestTotalRegex().Match(output);
+        if (match.Success)
+        {
+            if (int.TryParse(match.Groups["total"].Value, out var total))
+                result.Output["total"] = total;
+        }
+
+        var passedMatch = JestTestPassedRegex().Match(output);
+        if (passedMatch.Success && int.TryParse(passedMatch.Groups["passed"].Value, out var passed))
+            result.Output["passed"] = passed;
+
+        var failedMatch = JestTestFailedRegex().Match(output);
+        if (failedMatch.Success && int.TryParse(failedMatch.Groups["failed"].Value, out var failed))
+            result.Output["failed"] = failed;
+        else
+            result.Output["failed"] = 0;
+    }
+
+    private static void EnrichQualityOutput(string toolName, string output, ToolResult result)
+    {
+        switch (toolName)
+        {
+            case "dotnet_format":
+                ParseDotnetFormatOutput(output, result);
+                break;
+            case "eslint":
+                ParseEslintOutput(output, result);
+                break;
+            case "checkstyle":
+                ParseCheckstyleOutput(output, result);
+                break;
+        }
+    }
+
+    private static void ParseDotnetFormatOutput(string output, ToolResult result)
+    {
+        // dotnet format --verify-no-changes exits non-zero when there are formatting issues
+        // Count lines that contain file paths with formatting changes
+        var issues = DotnetFormatIssueRegex().Matches(output);
+        result.Output["issues"] = issues.Select(m => m.Value.Trim()).ToList();
+    }
+
+    private static void ParseEslintOutput(string output, ToolResult result)
+    {
+        // Count problem lines: "X problems (Y errors, Z warnings)" or individual file issues
+        var match = EslintProblemsRegex().Match(output);
+        if (match.Success)
+        {
+            result.Output["issues"] = new List<string> { match.Value.Trim() };
+        }
+        else
+        {
+            // Collect lines that look like ESLint warnings/errors
+            var issues = output.Split('\n')
+                .Where(l => EslintLineIssueRegex().IsMatch(l))
+                .Select(l => l.Trim())
+                .ToList();
+            result.Output["issues"] = issues;
+        }
+    }
+
+    private static void ParseCheckstyleOutput(string output, ToolResult result)
+    {
+        // Maven checkstyle: "[ERROR]" lines indicate violations
+        var issues = output.Split('\n')
+            .Where(l => l.Contains("[ERROR]", StringComparison.OrdinalIgnoreCase)
+                        || l.Contains("[WARNING]", StringComparison.OrdinalIgnoreCase))
+            .Select(l => l.Trim())
+            .ToList();
+        result.Output["issues"] = issues;
+    }
+
+    // ───────────────────────────── regex patterns (compiled) ───────────
+
+    [GeneratedRegex(@"Failed:\s*(?<failed>\d+).*Passed:\s*(?<passed>\d+).*Total:\s*(?<total>\d+)", RegexOptions.IgnoreCase)]
+    private static partial Regex DotnetTestTotalRegex();
+
+    [GeneratedRegex(@"Tests run:\s*(?<run>\d+),\s*Failures:\s*(?<failures>\d+),\s*Errors:\s*(?<errors>\d+)", RegexOptions.IgnoreCase)]
+    private static partial Regex MavenTestRegex();
+
+    [GeneratedRegex(@"Tests:\s+.*?(?<total>\d+)\s+total", RegexOptions.IgnoreCase)]
+    private static partial Regex JestTestTotalRegex();
+
+    [GeneratedRegex(@"(?<passed>\d+)\s+passed", RegexOptions.IgnoreCase)]
+    private static partial Regex JestTestPassedRegex();
+
+    [GeneratedRegex(@"(?<failed>\d+)\s+failed", RegexOptions.IgnoreCase)]
+    private static partial Regex JestTestFailedRegex();
+
+    [GeneratedRegex(@"^\s*\S+.*\(\d+,\d+\):", RegexOptions.Multiline)]
+    private static partial Regex DotnetFormatIssueRegex();
+
+    [GeneratedRegex(@"\d+\s+problems?\s*\(\d+\s+errors?,\s*\d+\s+warnings?\)", RegexOptions.IgnoreCase)]
+    private static partial Regex EslintProblemsRegex();
+
+    [GeneratedRegex(@"\d+:\d+\s+(error|warning)\s+")]
+    private static partial Regex EslintLineIssueRegex();
 
     // ───────────────────────────── api ─────────────────────────────────
 
