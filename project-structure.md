@@ -47,8 +47,13 @@ autonomous-software-factory/
 │       │   ├── AgentDefinition.cs
 │       │   ├── SkillDefinition.cs
 │       │   ├── ToolDefinition.cs
+│       │   ├── PromptDefinition.cs
 │       │   ├── ExecutionContext.cs
-│       │   └── ExecutionResult.cs
+│       │   ├── ExecutionResult.cs
+│       │   ├── AgentExecutionRequest.cs
+│       │   ├── AgentResult.cs
+│       │   ├── ToolExecutionRequest.cs
+│       │   └── ToolResult.cs
 │       │
 │       ├── Yaml/
 │       │   └── YamlConfigLoader.cs
@@ -152,8 +157,13 @@ Classes que mapeiam os YAMLs:
 * `AgentDefinition` — cada agente do agents.yaml
 * `SkillDefinition` — cada skill do skills_registry.yaml
 * `ToolDefinition` — cada tool do tools.yaml
+* `PromptDefinition` — cada prompt do prompts.yaml
 * `ExecutionContext` — estado compartilhado entre steps
 * `ExecutionResult` — resultado de cada execução
+* `AgentExecutionRequest` — dados de entrada para execução de um agente
+* `AgentResult` — resultado retornado pelo agente
+* `ToolExecutionRequest` — dados de entrada para execução de uma tool
+* `ToolResult` — resultado retornado pela tool
 
 ## `Yaml/`
 
@@ -222,6 +232,7 @@ public interface IYamlConfigLoader
     List<AgentDefinition> LoadAgents(string path);
     List<SkillDefinition> LoadSkills(string path);
     List<ToolDefinition> LoadTools(string path);
+    List<PromptDefinition> LoadPrompts(string path);
 }
 ```
 

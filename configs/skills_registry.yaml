@@ -190,3 +190,18 @@ skills:
       Instale dependências conforme o projeto.
     constraints:
       - Validar sucesso da instalação
+
+  - name: file_operations
+    type: operational
+    description: Criação, edição e exclusão de arquivos no workspace.
+    tools:
+      - write_file
+      - create_file
+      - delete_file
+    instructions: |
+      Manipule arquivos dentro do workspace de forma segura.
+      Sempre valide que o caminho está dentro do workspace permitido.
+    constraints:
+      - Não operar fora do workspace
+      - Não excluir diretórios inteiros
+      - Criar diretórios intermediários quando necessário

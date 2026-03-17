@@ -93,6 +93,12 @@ workflow:
         project_context: "{{steps.analyze_project.output.project_context}}"
       output:
         codebase_path: codebase_path
+      retry:
+        max_attempts: 3
+        strategy: simple
+      on_failure:
+        action: stop
+        message: "Falha ao clonar repositório. Verifique URL e permissões."
       next: analyze_codebase
 
     - id: analyze_codebase
@@ -171,6 +177,12 @@ workflow:
         execution_settings: "{{context.inputs.execution_settings}}"
       output:
         environment_ready: environment_ready
+      retry:
+        max_attempts: 3
+        strategy: simple
+      on_failure:
+        action: stop
+        message: "Falha ao preparar ambiente. Verifique dependências e conectividade."
       next: implement_code
 
     - id: implement_code
@@ -198,6 +210,12 @@ workflow:
         project_context: "{{steps.analyze_project.output.project_context}}"
       output:
         build_result: build_result
+      retry:
+        max_attempts: 3
+        strategy: simple
+      on_failure:
+        action: stop
+        message: "Build falhou após tentativas. Verifique erros de compilação."
       next: execute_tests
 
     - id: execute_tests
@@ -211,6 +229,12 @@ workflow:
         project_context: "{{steps.analyze_project.output.project_context}}"
       output:
         test_results: test_results
+      retry:
+        max_attempts: 2
+        strategy: simple
+      on_failure:
+        action: continue
+        message: "Testes falharam. Prosseguindo para relatório de qualidade."
       next: validate_quality
 
     - id: validate_quality
@@ -254,6 +278,12 @@ workflow:
         requirement: "{{steps.receive_requirement.output.validated_requirement}}"
       output:
         pr_result: pr_result
+      retry:
+        max_attempts: 2
+        strategy: simple
+      on_failure:
+        action: stop
+        message: "Falha ao criar Pull Request. Verifique permissões e token GitHub."
       next: finalize_workflow
 
     - id: finalize_workflow

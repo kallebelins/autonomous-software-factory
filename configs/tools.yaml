@@ -9,6 +9,7 @@ tools:
   - name: git_clone
     category: git
     description: Clona um repositório Git para um diretório local.
+    execution_type: command
     input:
       repo_url: string
       branch: string
@@ -23,9 +24,13 @@ tools:
   - name: git_branch
     category: git
     description: Cria uma nova branch.
+    execution_type: command
     input:
       branch_name: string
       base_branch: string
+      working_directory: string
+    output:
+      branch_created: boolean
     command: "git checkout -b {{branch_name}} {{base_branch}}"
     constraints:
       - Não sobrescrever branch existente
@@ -33,8 +38,12 @@ tools:
   - name: git_commit
     category: git
     description: Realiza commit das alterações.
+    execution_type: command
     input:
       message: string
+      working_directory: string
+    output:
+      commit_hash: string
     command: "git add . && git commit -m '{{message}}'"
     constraints:
       - Não permitir commit vazio
@@ -42,24 +51,43 @@ tools:
   - name: git_push
     category: git
     description: Envia alterações para o repositório remoto.
+    execution_type: command
     input:
       branch_name: string
+      working_directory: string
+    output:
+      push_success: boolean
     command: "git push origin {{branch_name}}"
 
   - name: create_pull_request
     category: git
     description: Cria um Pull Request no GitHub.
+    execution_type: api
     input:
       title: string
       description: string
       branch: string
-    execution_type: api
+      base_branch: string
+      owner: string
+      repo: string
+    output:
+      pr_url: string
+      pr_number: integer
     api:
       provider: github
-      endpoint: "/repos/{owner}/{repo}/pulls"
+      endpoint: "/repos/{{owner}}/{{repo}}/pulls"
       method: POST
+      headers:
+        Authorization: "Bearer {{secrets.github_token}}"
+        Accept: "application/vnd.github+json"
+      body:
+        title: "{{title}}"
+        body: "{{description}}"
+        head: "{{branch}}"
+        base: "{{base_branch}}"
     constraints:
       - Deve incluir descrição clara do PR
+      - Requer token de autenticação configurado
 
   # ===============================
   # 🧱 BUILD EXECUTION
@@ -68,6 +96,12 @@ tools:
   - name: dotnet_build
     category: build
     description: Compila projeto .NET
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      errors: array
     command: "dotnet build"
     constraints:
       - Falhar se houver erro de compilação
@@ -75,6 +109,12 @@ tools:
   - name: maven_build
     category: build
     description: Compila projeto Java com Maven
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      errors: array
     command: "mvn clean install"
     constraints:
       - Parar execução em caso de erro
@@ -82,6 +122,12 @@ tools:
   - name: npm_build
     category: build
     description: Compila projeto frontend
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      errors: array
     command: "npm run build"
     constraints:
       - Validar sucesso do build
@@ -93,6 +139,15 @@ tools:
   - name: dotnet_test
     category: test
     description: Executa testes .NET
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      total: integer
+      passed: integer
+      failed: integer
+      errors: array
     command: "dotnet test"
     constraints:
       - Não ignorar falhas
@@ -100,11 +155,29 @@ tools:
   - name: junit_test
     category: test
     description: Executa testes Java
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      total: integer
+      passed: integer
+      failed: integer
+      errors: array
     command: "mvn test"
 
   - name: jest_test
     category: test
     description: Executa testes frontend
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      total: integer
+      passed: integer
+      failed: integer
+      errors: array
     command: "npm test"
 
   # ===============================
@@ -114,16 +187,31 @@ tools:
   - name: dotnet_restore
     category: dependency
     description: Restaura dependências .NET
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
     command: "dotnet restore"
 
   - name: npm_install
     category: dependency
     description: Instala dependências Node.js
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
     command: "npm install"
 
   - name: maven_install
     category: dependency
     description: Instala dependências Maven
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
     command: "mvn install"
 
   # ===============================
@@ -149,20 +237,116 @@ tools:
       files: array
 
   # ===============================
+  # ✏️ FILE OPERATIONS
+  # ===============================
+
+  - name: write_file
+    category: file
+    description: Escreve conteúdo em um arquivo existente (sobrescreve).
+    execution_type: internal
+    input:
+      path: string
+      content: string
+    output:
+      success: boolean
+    constraints:
+      - Validar que o caminho está dentro do workspace
+      - Criar diretórios intermediários se necessário
+
+  - name: create_file
+    category: file
+    description: Cria um novo arquivo com o conteúdo especificado.
+    execution_type: internal
+    input:
+      path: string
+      content: string
+    output:
+      success: boolean
+    constraints:
+      - Falhar se o arquivo já existir
+      - Validar que o caminho está dentro do workspace
+
+  - name: delete_file
+    category: file
+    description: Remove um arquivo do workspace.
+    execution_type: internal
+    input:
+      path: string
+    output:
+      success: boolean
+    constraints:
+      - Validar que o caminho está dentro do workspace
+      - Não permitir exclusão de diretórios inteiros
+
+  # ===============================
+  # 🔍 CODE ANALYSIS
+  # ===============================
+
+  - name: read_files
+    category: analysis
+    description: Lê arquivos do projeto
+    execution_type: internal
+    input:
+      path: string
+    output:
+      content: string
+
+  - name: list_directory
+    category: analysis
+    description: Lista arquivos e diretórios
+    execution_type: internal
+    input:
+      path: string
+    output:
+      files: array
+
+  - name: search_files
+    category: analysis
+    description: Busca por padrão de texto em arquivos do projeto.
+    execution_type: internal
+    input:
+      pattern: string
+      path: string
+      file_filter: string
+    output:
+      matches: array
+    constraints:
+      - Limitar profundidade de busca
+      - Ignorar diretórios como node_modules, bin, obj
+
+  # ===============================
   # 🧹 QUALITY / LINT
   # ===============================
 
   - name: eslint
     category: quality
     description: Executa lint em projetos frontend
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      issues: array
     command: "npx eslint ."
 
   - name: dotnet_format
     category: quality
     description: Valida formatação .NET
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      issues: array
     command: "dotnet format --verify-no-changes"
 
   - name: checkstyle
     category: quality
     description: Valida padrão Java
+    execution_type: command
+    input:
+      working_directory: string
+    output:
+      success: boolean
+      issues: array
     command: "mvn checkstyle:check"
