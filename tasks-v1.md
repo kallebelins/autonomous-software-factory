@@ -144,11 +144,11 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 2.4 Testes da Fase 2
 
-- [ ] Teste: LlmClient — mock de HttpClient, validar montagem do request
-- [ ] Teste: AgentExecutor — mock de ILlmClient, validar montagem de prompt e parse de output
+- [x] Teste: LlmClient — mock de HttpClient, validar montagem do request
+- [x] Teste: AgentExecutor — mock de ILlmClient, validar montagem de prompt e parse de output
 - [x] Teste: ToolExecutor — execution_type `internal` (read_files, list_directory, write_file)
 - [x] Teste: ToolExecutor — execution_type `command` com comando simples
-- [ ] Teste: integração AgentExecutor + ToolExecutor com mock de LLM
+- [x] Teste: integração AgentExecutor + ToolExecutor com mock de LLM
 
 ---
 
