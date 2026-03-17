@@ -93,13 +93,13 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 2.1 LLM Client
 
-- [ ] `Llm/ILlmClient.cs` — interface com `CompleteAsync(string prompt, CancellationToken)`
-- [ ] `Llm/LlmClient.cs` — implementação:
-  - [ ] Ler configuração de `appsettings.json` (Provider, Model, ApiKey)
-  - [ ] Chamar API OpenAI (ou compatível) via `HttpClient`
-  - [ ] Enviar prompt como mensagem e retornar resposta como string
-  - [ ] Tratar erros HTTP e timeouts
-  - [ ] Log da chamada (prompt resumido, tokens, duração)
+- [x] `Llm/ILlmClient.cs` — interface com `CompleteAsync(string prompt, CancellationToken)`
+- [x] `Llm/LlmClient.cs` — implementação:
+  - [x] Ler configuração de `appsettings.json` (Provider, Model, ApiKey)
+  - [x] Chamar API OpenAI (ou compatível) via `HttpClient`
+  - [x] Enviar prompt como mensagem e retornar resposta como string
+  - [x] Tratar erros HTTP e timeouts
+  - [x] Log da chamada (prompt resumido, tokens, duração)
 
 ### 2.2 Agent Executor
 

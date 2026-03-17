@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using AutonomousSoftwareFactory.Agents;
+using AutonomousSoftwareFactory.Llm;
 using AutonomousSoftwareFactory.Models;
 using AutonomousSoftwareFactory.State;
 using AutonomousSoftwareFactory.Workflow;
@@ -28,6 +29,7 @@ services.AddLogging(builder =>
 services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 services.AddSingleton<IStateStore, InMemoryStateStore>();
 services.AddSingleton<IAgentExecutor, StubAgentExecutor>();
+services.AddHttpClient<ILlmClient, LlmClient>();
 
 // 3. Load YAML configs
 var configsPath = configuration["Configs:BasePath"] ?? "./configs";
