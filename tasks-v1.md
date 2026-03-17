@@ -205,9 +205,9 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 4.3 Scripts de automação
 
-- [ ] Atualizar `scripts/setup-env.ps1` — incluir `dotnet restore` do projeto
-- [ ] Atualizar `scripts/run-local.ps1` — validar que projeto compila antes de executar
-- [ ] Testar execução via `scripts/run-local.ps1 -Requirement ./samples/requirement-sample.json`
+- [x] Atualizar `scripts/setup-env.ps1` — incluir `dotnet restore` do projeto
+- [x] Atualizar `scripts/run-local.ps1` — validar que projeto compila antes de executar
+- [x] Testar execução via `scripts/run-local.ps1 -Requirement ./samples/requirement-sample.json`
 
 ### 4.4 Validação final
 

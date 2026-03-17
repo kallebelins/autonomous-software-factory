@@ -30,5 +30,17 @@ foreach ($folder in $folders) {
     }
 }
 
+# Restaurar pacotes NuGet
+Write-Host ""
+Write-Host "Restaurando pacotes NuGet..." -ForegroundColor Cyan
+
+$restoreResult = dotnet restore "$PSScriptRoot\..\AutonomousSoftwareFactory.slnx" 2>&1
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "[OK] dotnet restore concluido com sucesso" -ForegroundColor Green
+} else {
+    Write-Host "[ERRO] dotnet restore falhou:" -ForegroundColor Red
+    Write-Host $restoreResult -ForegroundColor Red
+}
+
 Write-Host ""
 Write-Host "Setup concluido." -ForegroundColor Cyan

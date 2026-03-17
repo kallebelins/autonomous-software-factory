@@ -1,0 +1,26 @@
+{
+  "WorkflowName": "AutonomousSoftwareFactoryWorkflow",
+  "CompletedSteps": [
+    "receive_requirement"
+  ],
+  "LastCompletedStep": "receive_requirement",
+  "Inputs": {
+    "title": "Criar endpoint de cadastro de usu\u00E1rio",
+    "description": "Implementar API REST para cadastro de usu\u00E1rios com valida\u00E7\u00E3o de email, senha forte e verifica\u00E7\u00E3o de duplicidade. O endpoint deve retornar o usu\u00E1rio criado com status 201.",
+    "repository": {
+      "url": "https://github.com/owner/project-name",
+      "branch": "main"
+    },
+    "acceptance_criteria": [
+      "POST /api/users deve criar um novo usu\u00E1rio",
+      "Validar formato de email",
+      "Validar senha com m\u00EDnimo 8 caracteres",
+      "Retornar 409 se email j\u00E1 existir",
+      "Retornar 201 com dados do usu\u00E1rio criado"
+    ]
+  },
+  "StateData": {
+    "steps.receive_requirement.output.validated_requirement": "{{context.inputs.requirement}}"
+  },
+  "Timestamp": "2026-03-17T14:11:34.9433371Z"
+}
