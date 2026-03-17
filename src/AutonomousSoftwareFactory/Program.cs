@@ -29,7 +29,8 @@ services.AddLogging(builder =>
 
 services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 services.AddSingleton<IStateStore, InMemoryStateStore>();
-services.AddSingleton<IToolExecutor, StubToolExecutor>();
+services.AddHttpClient();
+services.AddSingleton<IToolExecutor, ToolExecutor>();
 services.AddSingleton<IAgentExecutor, AgentExecutor>();
 services.AddHttpClient<ILlmClient, LlmClient>();
 

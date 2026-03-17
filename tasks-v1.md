@@ -116,38 +116,38 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 2.3 Tool Executor
 
-- [ ] `Tools/IToolExecutor.cs` — interface com `ExecuteAsync(ToolExecutionRequest, CancellationToken)`
-- [ ] `Tools/ToolExecutor.cs` — implementação:
-  - [ ] Resolver tool pelo nome no catálogo carregado
-  - [ ] Para `execution_type: command`:
-    - [ ] Substituir placeholders `{{input}}` no template do comando
-    - [ ] Executar processo externo (`Process.Start`)
-    - [ ] Capturar stdout e stderr
-    - [ ] Retornar `ToolResult` com success, output e errors
-  - [ ] Para `execution_type: api`:
-    - [ ] Montar request HTTP com endpoint, method, headers e body
-    - [ ] Substituir placeholders nos templates
-    - [ ] Executar chamada via `HttpClient`
-    - [ ] Retornar `ToolResult` com resposta da API
-  - [ ] Para `execution_type: internal`:
-    - [ ] Implementar `read_files` — ler arquivo do workspace
-    - [ ] Implementar `list_directory` — listar diretório
-    - [ ] Implementar `search_files` — buscar padrão em arquivos
-    - [ ] Implementar `write_file` — escrever em arquivo existente
-    - [ ] Implementar `create_file` — criar novo arquivo
-    - [ ] Implementar `delete_file` — remover arquivo
-    - [ ] Validar que caminhos estão dentro do workspace
-  - [ ] Detecção de stack do projeto-alvo:
-    - [ ] `.csproj` → usar comandos `dotnet`
-    - [ ] `pom.xml` → usar comandos `mvn`
-    - [ ] `package.json` → usar comandos `npm`
+- [x] `Tools/IToolExecutor.cs` — interface com `ExecuteAsync(ToolExecutionRequest, CancellationToken)`
+- [x] `Tools/ToolExecutor.cs` — implementação:
+  - [x] Resolver tool pelo nome no catálogo carregado
+  - [x] Para `execution_type: command`:
+    - [x] Substituir placeholders `{{input}}` no template do comando
+    - [x] Executar processo externo (`Process.Start`)
+    - [x] Capturar stdout e stderr
+    - [x] Retornar `ToolResult` com success, output e errors
+  - [x] Para `execution_type: api`:
+    - [x] Montar request HTTP com endpoint, method, headers e body
+    - [x] Substituir placeholders nos templates
+    - [x] Executar chamada via `HttpClient`
+    - [x] Retornar `ToolResult` com resposta da API
+  - [x] Para `execution_type: internal`:
+    - [x] Implementar `read_files` — ler arquivo do workspace
+    - [x] Implementar `list_directory` — listar diretório
+    - [x] Implementar `search_files` — buscar padrão em arquivos
+    - [x] Implementar `write_file` — escrever em arquivo existente
+    - [x] Implementar `create_file` — criar novo arquivo
+    - [x] Implementar `delete_file` — remover arquivo
+    - [x] Validar que caminhos estão dentro do workspace
+  - [x] Detecção de stack do projeto-alvo:
+    - [x] `.csproj` → usar comandos `dotnet`
+    - [x] `pom.xml` → usar comandos `mvn`
+    - [x] `package.json` → usar comandos `npm`
 
 ### 2.4 Testes da Fase 2
 
 - [ ] Teste: LlmClient — mock de HttpClient, validar montagem do request
 - [ ] Teste: AgentExecutor — mock de ILlmClient, validar montagem de prompt e parse de output
-- [ ] Teste: ToolExecutor — execution_type `internal` (read_files, list_directory, write_file)
-- [ ] Teste: ToolExecutor — execution_type `command` com comando simples
+- [x] Teste: ToolExecutor — execution_type `internal` (read_files, list_directory, write_file)
+- [x] Teste: ToolExecutor — execution_type `command` com comando simples
 - [ ] Teste: integração AgentExecutor + ToolExecutor com mock de LLM
 
 ---
