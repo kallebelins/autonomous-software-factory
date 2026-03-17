@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AutonomousSoftwareFactory.Llm;
+using AutonomousSoftwareFactory.Logging;
 using AutonomousSoftwareFactory.Models;
 using AutonomousSoftwareFactory.Tools;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ public class AgentExecutor : IAgentExecutor
     private readonly IToolExecutor _toolExecutor;
     private readonly List<PromptDefinition> _prompts;
     private readonly ILogger<AgentExecutor> _logger;
+    private readonly IRunLogger _runLogger;
 
     private const int MaxToolRounds = 10;
 
@@ -27,12 +29,14 @@ public class AgentExecutor : IAgentExecutor
         ILlmClient llmClient,
         IToolExecutor toolExecutor,
         List<PromptDefinition> prompts,
-        ILogger<AgentExecutor> logger)
+        ILogger<AgentExecutor> logger,
+        IRunLogger? runLogger = null)
     {
         _llmClient = llmClient;
         _toolExecutor = toolExecutor;
         _prompts = prompts;
         _logger = logger;
+        _runLogger = runLogger ?? NullRunLogger.Instance;
     }
 
     public async Task<AgentResult> ExecuteAsync(AgentExecutionRequest request, CancellationToken ct)
@@ -285,6 +289,17 @@ public class AgentExecutor : IAgentExecutor
             results.Add(result);
 
             _logger.LogInformation("Tool '{Tool}' completed — success={Success}", call.Tool, result.Success);
+
+            var outputSummary = result.Output.Count > 0
+                ? JsonSerializer.Serialize(result.Output, JsonOptions)
+                : null;
+            _runLogger.LogToolExecution(
+                call.Tool,
+                toolDef.ExecutionType,
+                command: null,
+                result.Success,
+                outputSummary,
+                result.Errors.Count > 0 ? result.Errors : null);
         }
 
         return results;

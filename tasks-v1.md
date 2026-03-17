@@ -172,11 +172,11 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 3.3 Logs de execução
 
-- [ ] Criar sistema de log por run em `logs/`
-  - [ ] Nome do arquivo: `{timestamp}-{workflow-name}.log`
-  - [ ] Log estruturado: step, status, duração, erros
-  - [ ] Log de cada chamada LLM (prompt resumido, resposta resumida)
-  - [ ] Log de cada tool executada (comando, output, erros)
+- [x] Criar sistema de log por run em `logs/`
+  - [x] Nome do arquivo: `{timestamp}-{workflow-name}.log`
+  - [x] Log estruturado: step, status, duração, erros
+  - [x] Log de cada chamada LLM (prompt resumido, resposta resumida)
+  - [x] Log de cada tool executada (comando, output, erros)
 
 ### 3.4 Testes da Fase 3
 

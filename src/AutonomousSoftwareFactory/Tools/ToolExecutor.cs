@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using AutonomousSoftwareFactory.Logging;
 using AutonomousSoftwareFactory.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -13,6 +14,7 @@ public partial class ToolExecutor : IToolExecutor
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ToolExecutor> _logger;
+    private readonly IRunLogger _runLogger;
     private readonly string _workspaceBasePath;
 
     private static readonly HashSet<string> IgnoredDirectories = new(StringComparer.OrdinalIgnoreCase)
@@ -23,11 +25,13 @@ public partial class ToolExecutor : IToolExecutor
     public ToolExecutor(
         IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        ILogger<ToolExecutor> logger)
+        ILogger<ToolExecutor> logger,
+        IRunLogger? runLogger = null)
     {
         _httpClientFactory = httpClientFactory;
         _configuration = configuration;
         _logger = logger;
+        _runLogger = runLogger ?? NullRunLogger.Instance;
         _workspaceBasePath = Path.GetFullPath(
             configuration["Workspace:BasePath"] ?? "./workspace");
     }
@@ -41,7 +45,7 @@ public partial class ToolExecutor : IToolExecutor
 
         try
         {
-            return tool.ExecutionType switch
+            var result = tool.ExecutionType switch
             {
                 "command" => await ExecuteCommandAsync(tool, request.Inputs, request.WorkingDirectory, ct),
                 "api" => await ExecuteApiAsync(tool, request.Inputs, ct),
@@ -52,6 +56,19 @@ public partial class ToolExecutor : IToolExecutor
                     Errors = [$"Unknown execution_type '{tool.ExecutionType}'"]
                 }
             };
+
+            var outputSummary = result.Output.TryGetValue("stdout", out var stdout)
+                ? stdout?.ToString()
+                : result.Output.Count > 0 ? JsonSerializer.Serialize(result.Output) : null;
+            _runLogger.LogToolExecution(
+                tool.Name,
+                tool.ExecutionType,
+                tool.ExecutionType == "command" ? tool.Command : null,
+                result.Success,
+                outputSummary,
+                result.Errors.Count > 0 ? result.Errors : null);
+
+            return result;
         }
         catch (OperationCanceledException)
         {
@@ -60,6 +77,7 @@ public partial class ToolExecutor : IToolExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex, "ToolExecutor: unhandled error on tool '{Tool}'", tool.Name);
+            _runLogger.LogToolExecution(tool.Name, tool.ExecutionType, command: null, success: false, output: null, errors: [ex.Message]);
             return new ToolResult
             {
                 Success = false,

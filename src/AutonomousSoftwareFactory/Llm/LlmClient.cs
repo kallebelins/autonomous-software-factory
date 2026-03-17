@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using AutonomousSoftwareFactory.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -10,12 +11,14 @@ public class LlmClient : ILlmClient
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<LlmClient> _logger;
+    private readonly IRunLogger _runLogger;
     private readonly string _model;
 
-    public LlmClient(HttpClient httpClient, IConfiguration configuration, ILogger<LlmClient> logger)
+    public LlmClient(HttpClient httpClient, IConfiguration configuration, ILogger<LlmClient> logger, IRunLogger? runLogger = null)
     {
         _httpClient = httpClient;
         _logger = logger;
+        _runLogger = runLogger ?? NullRunLogger.Instance;
 
         var provider = configuration["Llm:Provider"] ?? "OpenAI";
         _model = configuration["Llm:Model"] ?? "gpt-4.1";
@@ -103,6 +106,8 @@ public class LlmClient : ILlmClient
         _logger.LogInformation(
             "LLM call completed — tokens={Tokens}, duration={Duration}ms, response={Response}",
             tokensUsed, duration.TotalMilliseconds, resultSummary);
+
+        _runLogger.LogLlmCall(_model, promptSummary, resultSummary, tokensUsed, duration.TotalMilliseconds);
 
         return result;
     }

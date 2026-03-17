@@ -3,6 +3,7 @@ namespace AutonomousSoftwareFactory.Workflow;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using AutonomousSoftwareFactory.Agents;
+using AutonomousSoftwareFactory.Logging;
 using AutonomousSoftwareFactory.Models;
 using AutonomousSoftwareFactory.State;
 using Microsoft.Extensions.Logging;
@@ -17,6 +18,7 @@ public partial class WorkflowEngine : IWorkflowEngine
     private readonly IAgentExecutor _agentExecutor;
     private readonly IStateStore _stateStore;
     private readonly ILogger<WorkflowEngine> _logger;
+    private readonly IRunLogger _runLogger;
 
     public WorkflowEngine(
         WorkflowDefinition workflow,
@@ -26,7 +28,8 @@ public partial class WorkflowEngine : IWorkflowEngine
         List<PromptDefinition> prompts,
         IAgentExecutor agentExecutor,
         IStateStore stateStore,
-        ILogger<WorkflowEngine> logger)
+        ILogger<WorkflowEngine> logger,
+        IRunLogger? runLogger = null)
     {
         _workflow = workflow;
         _agents = agents;
@@ -36,6 +39,7 @@ public partial class WorkflowEngine : IWorkflowEngine
         _agentExecutor = agentExecutor;
         _stateStore = stateStore;
         _logger = logger;
+        _runLogger = runLogger ?? NullRunLogger.Instance;
     }
 
     public async Task<ExecutionResult> ExecuteAsync(ExecutionContext context, CancellationToken ct)
@@ -48,6 +52,7 @@ public partial class WorkflowEngine : IWorkflowEngine
 
         _logger.LogInformation("Workflow '{Name}' started with {Count} steps",
             _workflow.Name, _workflow.Steps.Count);
+        _runLogger.LogWorkflowStart(_workflow.Name, _workflow.Steps.Count);
 
         while (currentStepId is not null)
         {
@@ -89,6 +94,7 @@ public partial class WorkflowEngine : IWorkflowEngine
 
         _logger.LogInformation("Workflow '{Name}' finished with status '{Status}' in {Duration}",
             _workflow.Name, result.Status, result.Duration);
+        _runLogger.LogWorkflowEnd(_workflow.Name, result.Status, result.Duration);
 
         return result;
     }
@@ -103,16 +109,22 @@ public partial class WorkflowEngine : IWorkflowEngine
         {
             _logger.LogInformation("Step '{StepId}' ({Type}) — attempt {Attempt}/{Max}",
                 step.Id, step.Type, attempt, maxAttempts);
+            _runLogger.LogStepStart(step.Id, step.Name, step.Type, attempt, maxAttempts);
 
+            var stepStopwatch = Stopwatch.StartNew();
             try
             {
                 var stepResult = await ExecuteStepAsync(step, context, ct);
+                stepStopwatch.Stop();
 
                 if (stepResult)
                 {
                     _logger.LogInformation("Step '{StepId}' completed successfully", step.Id);
+                    _runLogger.LogStepEnd(step.Id, "success", stepStopwatch.Elapsed);
                     return true;
                 }
+
+                _runLogger.LogStepEnd(step.Id, "failed", stepStopwatch.Elapsed);
             }
             catch (OperationCanceledException)
             {
@@ -120,8 +132,10 @@ public partial class WorkflowEngine : IWorkflowEngine
             }
             catch (Exception ex)
             {
+                stepStopwatch.Stop();
                 _logger.LogError(ex, "Step '{StepId}' threw exception on attempt {Attempt}", step.Id, attempt);
                 result.Errors.Add($"Step '{step.Id}' attempt {attempt}: {ex.Message}");
+                _runLogger.LogStepEnd(step.Id, "error", stepStopwatch.Elapsed, [ex.Message]);
             }
 
             if (attempt < maxAttempts)

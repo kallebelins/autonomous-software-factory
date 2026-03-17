@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using AutonomousSoftwareFactory.Agents;
 using AutonomousSoftwareFactory.Llm;
+using AutonomousSoftwareFactory.Logging;
 using AutonomousSoftwareFactory.Models;
 using AutonomousSoftwareFactory.State;
 using AutonomousSoftwareFactory.Tools;
@@ -50,6 +51,11 @@ services.AddSingleton(skills);
 services.AddSingleton(tools);
 services.AddSingleton(prompts);
 
+// 3.5. Run logger — per-run file log
+var logPath = configuration["Execution:LogPath"] ?? "./logs";
+var runLogger = new FileRunLogger(logPath, workflow.Name);
+services.AddSingleton<IRunLogger>(runLogger);
+
 services.AddSingleton<IWorkflowEngine, WorkflowEngine>();
 
 var serviceProvider = services.BuildServiceProvider();
@@ -93,11 +99,15 @@ Console.CancelKeyPress += (_, e) =>
 
 var result = await engine.ExecuteAsync(context, cts.Token);
 
+// Dispose run logger to flush all entries
+runLogger.Dispose();
+
 // 7. Display final result
 Console.WriteLine();
 Console.WriteLine("=== Execution Result ===");
 Console.WriteLine($"Status:   {result.Status}");
 Console.WriteLine($"Duration: {result.Duration}");
+Console.WriteLine($"Log:      {runLogger.FilePath}");
 
 if (result.Outputs.Count > 0)
 {
