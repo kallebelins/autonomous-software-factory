@@ -1,6 +1,7 @@
 namespace AutonomousSoftwareFactory.Tests;
 
 using System.Diagnostics;
+using System.Net;
 using AutonomousSoftwareFactory.Models;
 using AutonomousSoftwareFactory.Tools;
 using Microsoft.Extensions.Configuration;
@@ -879,6 +880,238 @@ public class ToolExecutorTests : IDisposable
         Assert.True(pushResult.Success, $"Push failed: {string.Join("; ", pushResult.Errors)}");
     }
 
+    // ───────────────────────────── git: clone local repo (standalone) ──
+
+    [Fact]
+    public async Task GitClone_LocalRepo_ClonesSuccessfully()
+    {
+        // Create a bare repo (acts as remote)
+        var bareRepoPath = Path.Combine(_tempWorkspace, "remote.git");
+        await RunGit($"init --bare \"{bareRepoPath}\"", _tempWorkspace);
+
+        // Seed with initial commit
+        var seedPath = Path.Combine(_tempWorkspace, "seed");
+        Directory.CreateDirectory(seedPath);
+        await RunGit("init -b main", seedPath);
+        await RunGit("config user.email test@test.com", seedPath);
+        await RunGit("config user.name Test", seedPath);
+        File.WriteAllText(Path.Combine(seedPath, "README.md"), "# Test Repo");
+        await RunGit("add .", seedPath);
+        await RunGit("commit -m \"init\"", seedPath);
+        await RunGit($"remote add origin \"{bareRepoPath}\"", seedPath);
+        await RunGit("push origin main", seedPath);
+
+        // Clone using ToolExecutor
+        var cloneDest = Path.Combine(_tempWorkspace, "repos", "cloned");
+        var result = await ExecuteGitCommand("git_clone",
+            "git clone -b {{branch}} {{repo_url}} {{destination}}",
+            new()
+            {
+                ["repo_url"] = bareRepoPath,
+                ["branch"] = "main",
+                ["destination"] = cloneDest
+            });
+
+        Assert.True(result.Success, $"Clone failed: {string.Join("; ", result.Errors)}");
+        Assert.True(Directory.Exists(cloneDest));
+        Assert.True(File.Exists(Path.Combine(cloneDest, "README.md")));
+        Assert.Equal("# Test Repo", File.ReadAllText(Path.Combine(cloneDest, "README.md")));
+        Assert.Equal(cloneDest, result.Output["local_path"]?.ToString());
+    }
+
+    // ───────────────────────── create_pull_request: mock API ──────────
+
+    [Fact]
+    public async Task CreatePullRequest_MockApi_ReturnsSuccess()
+    {
+        var handler = new MockHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent(
+                    """{"number": 42, "html_url": "https://github.com/owner/my-repo/pull/42"}""",
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+
+        var executor = CreateExecutorWithHttpHandler(handler);
+
+        var tool = new ToolDefinition
+        {
+            Name = "create_pull_request",
+            ExecutionType = "api",
+            Api = new ApiDefinition
+            {
+                Provider = "github",
+                Endpoint = "/repos/{{owner}}/{{repo}}/pulls",
+                Method = "POST",
+                Headers = new()
+                {
+                    ["Authorization"] = "Bearer {{secrets.github_token}}",
+                    ["Accept"] = "application/vnd.github+json"
+                },
+                Body = new()
+                {
+                    ["title"] = "{{title}}",
+                    ["body"] = "{{description}}",
+                    ["head"] = "{{branch}}",
+                    ["base"] = "{{base_branch}}"
+                }
+            }
+        };
+
+        var request = new ToolExecutionRequest
+        {
+            Tool = tool,
+            Inputs = new()
+            {
+                ["owner"] = "owner",
+                ["repo"] = "my-repo",
+                ["title"] = "feat: new feature",
+                ["description"] = "Adds a new feature",
+                ["branch"] = "feature/new",
+                ["base_branch"] = "main"
+            }
+        };
+
+        var result = await executor.ExecuteAsync(request, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(201, result.Output["status_code"]);
+        Assert.Contains("42", result.Output["body"]?.ToString() ?? "");
+
+        // Verify request was sent correctly
+        var capturedReq = handler.LastRequest!;
+        Assert.Equal(HttpMethod.Post, capturedReq.Method);
+        Assert.Contains("/repos/owner/my-repo/pulls", capturedReq.RequestUri!.ToString());
+        Assert.Equal("Bearer fake-token", capturedReq.Headers.Authorization?.ToString());
+
+        var body = handler.LastRequestBody!;
+        Assert.Contains("feat: new feature", body);
+        Assert.Contains("feature/new", body);
+    }
+
+    [Fact]
+    public async Task CreatePullRequest_MockApi_HandlesApiError()
+    {
+        var handler = new MockHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+            {
+                Content = new StringContent(
+                    """{"message": "Validation Failed", "errors": [{"message": "A pull request already exists"}]}""",
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+
+        var executor = CreateExecutorWithHttpHandler(handler);
+
+        var tool = new ToolDefinition
+        {
+            Name = "create_pull_request",
+            ExecutionType = "api",
+            Api = new ApiDefinition
+            {
+                Provider = "github",
+                Endpoint = "/repos/{{owner}}/{{repo}}/pulls",
+                Method = "POST",
+                Headers = new()
+                {
+                    ["Authorization"] = "Bearer {{secrets.github_token}}",
+                    ["Accept"] = "application/vnd.github+json"
+                },
+                Body = new()
+                {
+                    ["title"] = "{{title}}",
+                    ["body"] = "{{description}}",
+                    ["head"] = "{{branch}}",
+                    ["base"] = "{{base_branch}}"
+                }
+            }
+        };
+
+        var request = new ToolExecutionRequest
+        {
+            Tool = tool,
+            Inputs = new()
+            {
+                ["owner"] = "owner",
+                ["repo"] = "my-repo",
+                ["title"] = "duplicate PR",
+                ["description"] = "This should fail",
+                ["branch"] = "feature/existing",
+                ["base_branch"] = "main"
+            }
+        };
+
+        var result = await executor.ExecuteAsync(request, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(422, result.Output["status_code"]);
+        Assert.Contains("Validation Failed", result.Output["body"]?.ToString() ?? "");
+        Assert.NotEmpty(result.Errors);
+        Assert.Contains("422", result.Errors[0]);
+    }
+
+    [Fact]
+    public async Task CreatePullRequest_MockApi_SendsCorrectHeadersAndBody()
+    {
+        var handler = new MockHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.Created)
+            {
+                Content = new StringContent("{\"number\": 1}",
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+
+        var executor = CreateExecutorWithHttpHandler(handler);
+
+        var tool = new ToolDefinition
+        {
+            Name = "create_pull_request",
+            ExecutionType = "api",
+            Api = new ApiDefinition
+            {
+                Provider = "github",
+                Endpoint = "/repos/{{owner}}/{{repo}}/pulls",
+                Method = "POST",
+                Headers = new()
+                {
+                    ["Authorization"] = "Bearer {{secrets.github_token}}",
+                    ["Accept"] = "application/vnd.github+json"
+                },
+                Body = new()
+                {
+                    ["title"] = "{{title}}",
+                    ["body"] = "{{description}}",
+                    ["head"] = "{{branch}}",
+                    ["base"] = "{{base_branch}}"
+                }
+            }
+        };
+
+        var request = new ToolExecutionRequest
+        {
+            Tool = tool,
+            Inputs = new()
+            {
+                ["owner"] = "testowner",
+                ["repo"] = "testrepo",
+                ["title"] = "PR Title",
+                ["description"] = "PR Body",
+                ["branch"] = "feature/x",
+                ["base_branch"] = "develop"
+            }
+        };
+
+        await executor.ExecuteAsync(request, CancellationToken.None);
+
+        var req = handler.LastRequest!;
+        Assert.Equal("https://api.github.com/repos/testowner/testrepo/pulls", req.RequestUri!.ToString());
+        Assert.True(req.Headers.Contains("Accept"));
+
+        var bodyStr = handler.LastRequestBody!;
+        Assert.Contains("PR Title", bodyStr);
+        Assert.Contains("PR Body", bodyStr);
+        Assert.Contains("feature/x", bodyStr);
+        Assert.Contains("develop", bodyStr);
+    }
+
     // ───────────────────────────── helpers ─────────────────────────────
 
     private Task<ToolResult> Execute(string toolName, string executionType,
@@ -962,8 +1195,49 @@ public class ToolExecutorTests : IDisposable
         }
     }
 
+    private ToolExecutor CreateExecutorWithHttpHandler(HttpMessageHandler handler)
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Workspace:BasePath"] = _tempWorkspace,
+                ["GitHub:Token"] = "fake-token",
+                ["GitHub:ApiUrl"] = "https://api.github.com"
+            })
+            .Build();
+
+        return new ToolExecutor(
+            new MockHttpClientFactory(handler),
+            config,
+            new NullLogger<ToolExecutor>());
+    }
+
     private class FakeHttpClientFactory : IHttpClientFactory
     {
         public HttpClient CreateClient(string name) => new();
+    }
+
+    private class MockHttpHandler : HttpMessageHandler
+    {
+        private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
+        public HttpRequestMessage? LastRequest { get; private set; }
+        public string? LastRequestBody { get; private set; }
+
+        public MockHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) => _handler = handler;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            LastRequest = request;
+            if (request.Content is not null)
+                LastRequestBody = await request.Content.ReadAsStringAsync(ct);
+            return _handler(request);
+        }
+    }
+
+    private class MockHttpClientFactory : IHttpClientFactory
+    {
+        private readonly HttpMessageHandler _handler;
+        public MockHttpClientFactory(HttpMessageHandler handler) => _handler = handler;
+        public HttpClient CreateClient(string name) => new(_handler, disposeHandler: false);
     }
 }

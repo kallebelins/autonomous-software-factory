@@ -180,10 +180,10 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 3.4 Testes da Fase 3
 
-- [ ] Teste: git_clone em repositório local de teste
-- [ ] Teste: create_pull_request com mock da GitHub API
-- [ ] Teste: build commands com mock de Process
-- [ ] Teste: geração de log file com conteúdo esperado
+- [x] Teste: git_clone em repositório local de teste
+- [x] Teste: create_pull_request com mock da GitHub API
+- [x] Teste: build commands com mock de Process
+- [x] Teste: geração de log file com conteúdo esperado
 
 ---
 
