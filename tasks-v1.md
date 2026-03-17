@@ -78,14 +78,14 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 1.8 Testes da Fase 1
 
-- [ ] Teste: deserializar `configs/workflow.yaml` e validar steps carregados
-- [ ] Teste: deserializar `configs/agents.yaml` e validar agentes carregados
-- [ ] Teste: deserializar `configs/skills_registry.yaml` e validar skills
-- [ ] Teste: deserializar `configs/tools.yaml` e validar tools
-- [ ] Teste: deserializar `configs/prompts.yaml` e validar prompts
-- [ ] Teste: InMemoryStateStore — Set, Get, Has
-- [ ] Teste: WorkflowEngine — executar workflow mínimo com steps de input e output
-- [ ] Validar que `dotnet test` passa sem erros
+- [x] Teste: deserializar `configs/workflow.yaml` e validar steps carregados
+- [x] Teste: deserializar `configs/agents.yaml` e validar agentes carregados
+- [x] Teste: deserializar `configs/skills_registry.yaml` e validar skills
+- [x] Teste: deserializar `configs/tools.yaml` e validar tools
+- [x] Teste: deserializar `configs/prompts.yaml` e validar prompts
+- [x] Teste: InMemoryStateStore — Set, Get, Has
+- [x] Teste: WorkflowEngine — executar workflow mínimo com steps de input e output
+- [x] Validar que `dotnet test` passa sem erros
 
 ---
 
