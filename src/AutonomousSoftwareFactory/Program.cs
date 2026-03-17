@@ -6,6 +6,7 @@ using AutonomousSoftwareFactory.Agents;
 using AutonomousSoftwareFactory.Llm;
 using AutonomousSoftwareFactory.Models;
 using AutonomousSoftwareFactory.State;
+using AutonomousSoftwareFactory.Tools;
 using AutonomousSoftwareFactory.Workflow;
 using AutonomousSoftwareFactory.Yaml;
 
@@ -28,7 +29,8 @@ services.AddLogging(builder =>
 
 services.AddSingleton<IYamlConfigLoader, YamlConfigLoader>();
 services.AddSingleton<IStateStore, InMemoryStateStore>();
-services.AddSingleton<IAgentExecutor, StubAgentExecutor>();
+services.AddSingleton<IToolExecutor, StubToolExecutor>();
+services.AddSingleton<IAgentExecutor, AgentExecutor>();
 services.AddHttpClient<ILlmClient, LlmClient>();
 
 // 3. Load YAML configs

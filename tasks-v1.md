@@ -103,16 +103,16 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 2.2 Agent Executor
 
-- [ ] `Agents/IAgentExecutor.cs` — interface com `ExecuteAsync(AgentExecutionRequest, CancellationToken)`
-- [ ] `Agents/AgentExecutor.cs` — implementação:
-  - [ ] Receber `AgentExecutionRequest` com agente, inputs e contexto
-  - [ ] Montar prompt final: system prompt + context injection + prompt do agente + inputs do step
-  - [ ] Injetar skills do agente como instruções no prompt
-  - [ ] Chamar `ILlmClient.CompleteAsync`
-  - [ ] Parsear resposta JSON do LLM
-  - [ ] Se o agente tem tools, identificar tools a executar na resposta
-  - [ ] Chamar `IToolExecutor` para cada tool necessária
-  - [ ] Retornar `AgentResult` com status, data e message
+- [x] `Agents/IAgentExecutor.cs` — interface com `ExecuteAsync(AgentExecutionRequest, CancellationToken)`
+- [x] `Agents/AgentExecutor.cs` — implementação:
+  - [x] Receber `AgentExecutionRequest` com agente, inputs e contexto
+  - [x] Montar prompt final: system prompt + context injection + prompt do agente + inputs do step
+  - [x] Injetar skills do agente como instruções no prompt
+  - [x] Chamar `ILlmClient.CompleteAsync`
+  - [x] Parsear resposta JSON do LLM
+  - [x] Se o agente tem tools, identificar tools a executar na resposta
+  - [x] Chamar `IToolExecutor` para cada tool necessária
+  - [x] Retornar `AgentResult` com status, data e message
 
 ### 2.3 Tool Executor
 
