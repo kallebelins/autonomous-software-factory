@@ -76,10 +76,20 @@ public partial class ToolExecutor : IToolExecutor
         if (string.IsNullOrWhiteSpace(tool.Command))
             return new ToolResult { Success = false, Errors = ["Tool has no command template"] };
 
-        var command = ReplacePlaceholders(tool.Command, inputs);
+        // Git-specific pre-validation and input enrichment
+        var preCheck = ValidateGitInputs(tool.Name, inputs);
+        if (preCheck is not null) return preCheck;
+
+        // Platform-specific command template adjustment (single quotes don't work in cmd.exe)
+        var commandTemplate = tool.Command;
+        if (OperatingSystem.IsWindows() && tool.Name == "git_commit")
+            commandTemplate = commandTemplate.Replace("'{{message}}'", "\"{{message}}\"");
+
+        var command = ReplacePlaceholders(commandTemplate, inputs);
         var workDir = ResolveWorkingDirectory(inputs, workingDirectory);
 
-        _logger.LogInformation("ToolExecutor: running command '{Command}' in '{Dir}'", command, workDir);
+        _logger.LogInformation("ToolExecutor: running command '{Command}' in '{Dir}'",
+            MaskSecretsInCommand(command), workDir);
 
         var isWindows = OperatingSystem.IsWindows();
         var psi = new ProcessStartInfo
@@ -125,6 +135,10 @@ public partial class ToolExecutor : IToolExecutor
         if (exitCode != 0)
             result.Errors.Add($"Command exited with code {exitCode}: {stderr.ToString().TrimEnd()}");
 
+        // Git-specific output enrichment
+        if (tool.Name == "git_clone" && result.Success)
+            result.Output["local_path"] = inputs.GetValueOrDefault("destination", "").Trim('"');
+
         return result;
     }
 
@@ -135,6 +149,18 @@ public partial class ToolExecutor : IToolExecutor
     {
         if (tool.Api is null)
             return new ToolResult { Success = false, Errors = ["Tool has no API definition"] };
+
+        // Validate GitHub token for PR creation
+        if (tool.Name == "create_pull_request")
+        {
+            var token = _configuration["GitHub:Token"];
+            if (string.IsNullOrEmpty(token))
+                return new ToolResult
+                {
+                    Success = false,
+                    Errors = ["GitHub token is not configured. Set 'GitHub:Token' in appsettings.json."]
+                };
+        }
 
         var api = tool.Api;
         var allPlaceholders = new Dictionary<string, string>(inputs);
@@ -394,6 +420,113 @@ public partial class ToolExecutor : IToolExecutor
             Success = true,
             Output = new Dictionary<string, object> { ["success"] = true }
         };
+    }
+
+    // ───────────────────────────── git operations ──────────────────────
+
+    private ToolResult? ValidateGitInputs(string toolName, Dictionary<string, string> inputs)
+    {
+        return toolName switch
+        {
+            "git_clone" => ValidateAndEnrichGitClone(inputs),
+            "git_commit" => ValidateGitCommit(inputs),
+            _ => null
+        };
+    }
+
+    private ToolResult? ValidateAndEnrichGitClone(Dictionary<string, string> inputs)
+    {
+        if (!inputs.TryGetValue("repo_url", out var repoUrl) || string.IsNullOrWhiteSpace(repoUrl))
+            return new ToolResult { Success = false, Errors = ["Missing required input 'repo_url'"] };
+
+        // Default destination to workspace/repos/{repo-name}
+        if (!inputs.TryGetValue("destination", out var dest) || string.IsNullOrWhiteSpace(dest))
+        {
+            var repoName = ExtractRepoNameFromUrl(repoUrl);
+            dest = Path.Combine(_workspaceBasePath, "repos", repoName);
+            inputs["destination"] = dest;
+        }
+        else if (!Path.IsPathRooted(dest))
+        {
+            dest = Path.Combine(_workspaceBasePath, "repos", dest);
+            inputs["destination"] = dest;
+        }
+
+        // Validate destination doesn't already exist
+        if (Directory.Exists(dest))
+            return new ToolResult { Success = false, Errors = [$"Destination directory already exists: {dest}"] };
+
+        // Ensure parent directory exists
+        var parentDir = Path.GetDirectoryName(dest);
+        if (parentDir is not null && !Directory.Exists(parentDir))
+            Directory.CreateDirectory(parentDir);
+
+        // Inject GitHub token for HTTPS authentication
+        var token = _configuration["GitHub:Token"];
+        if (!string.IsNullOrEmpty(token) && repoUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            inputs["repo_url"] = InjectTokenInGitUrl(repoUrl, token);
+
+        // Default branch if not specified
+        if (!inputs.ContainsKey("branch") || string.IsNullOrWhiteSpace(inputs["branch"]))
+            inputs["branch"] = "main";
+
+        // Quote paths containing spaces for command-line safety
+        if (dest.Contains(' '))
+            inputs["destination"] = $"\"{dest}\"";
+        var currentUrl = inputs["repo_url"];
+        if (currentUrl.Contains(' ') && !currentUrl.StartsWith('"'))
+            inputs["repo_url"] = $"\"{currentUrl}\"";
+
+        return null;
+    }
+
+    private static ToolResult? ValidateGitCommit(Dictionary<string, string> inputs)
+    {
+        if (!inputs.TryGetValue("message", out var message) || string.IsNullOrWhiteSpace(message))
+            return new ToolResult { Success = false, Errors = ["Missing required input 'message'"] };
+
+        return null;
+    }
+
+    internal static string ExtractRepoNameFromUrl(string repoUrl)
+    {
+        var name = repoUrl.TrimEnd('/');
+
+        if (name.EndsWith(".git", StringComparison.OrdinalIgnoreCase))
+            name = name[..^4];
+
+        var lastSlash = name.LastIndexOf('/');
+        if (lastSlash >= 0)
+            name = name[(lastSlash + 1)..];
+
+        // Handle SSH URLs (git@github.com:owner/repo)
+        var lastColon = name.LastIndexOf(':');
+        if (lastColon >= 0)
+            name = name[(lastColon + 1)..];
+
+        return string.IsNullOrEmpty(name) ? "repo" : name;
+    }
+
+    internal static string InjectTokenInGitUrl(string url, string token)
+    {
+        if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return url;
+
+        var withoutScheme = url["https://".Length..];
+
+        // Don't inject if credentials already present
+        if (withoutScheme.Contains('@'))
+            return url;
+
+        return $"https://x-access-token:{token}@{withoutScheme}";
+    }
+
+    private string MaskSecretsInCommand(string command)
+    {
+        var token = _configuration["GitHub:Token"];
+        if (!string.IsNullOrEmpty(token))
+            return command.Replace(token, "***");
+        return command;
     }
 
     // ───────────────────────────── stack detection ─────────────────────

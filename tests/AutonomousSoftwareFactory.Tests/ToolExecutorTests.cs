@@ -1,5 +1,6 @@
 namespace AutonomousSoftwareFactory.Tests;
 
+using System.Diagnostics;
 using AutonomousSoftwareFactory.Models;
 using AutonomousSoftwareFactory.Tools;
 using Microsoft.Extensions.Configuration;
@@ -35,7 +36,16 @@ public class ToolExecutorTests : IDisposable
     public void Dispose()
     {
         if (Directory.Exists(_tempWorkspace))
+        {
+            // Git creates read-only files in .git/objects/ — reset attributes before deleting
+            foreach (var file in Directory.EnumerateFiles(_tempWorkspace, "*", SearchOption.AllDirectories))
+            {
+                var attrs = File.GetAttributes(file);
+                if ((attrs & FileAttributes.ReadOnly) != 0)
+                    File.SetAttributes(file, attrs & ~FileAttributes.ReadOnly);
+            }
             Directory.Delete(_tempWorkspace, recursive: true);
+        }
     }
 
     // ───────────────────────────── internal: read_files ────────────────
@@ -414,6 +424,269 @@ public class ToolExecutorTests : IDisposable
         Assert.Null(resolved);
     }
 
+    // ───────────────────────────── git: helper methods ───────────────
+
+    [Theory]
+    [InlineData("https://github.com/owner/repo.git", "repo")]
+    [InlineData("https://github.com/owner/repo", "repo")]
+    [InlineData("https://github.com/owner/my-project.git", "my-project")]
+    [InlineData("git@github.com:owner/repo.git", "repo")]
+    [InlineData("https://github.com/owner/repo/", "repo")]
+    public void ExtractRepoNameFromUrl_VariousFormats(string url, string expected)
+    {
+        Assert.Equal(expected, ToolExecutor.ExtractRepoNameFromUrl(url));
+    }
+
+    [Fact]
+    public void InjectTokenInGitUrl_InjectsToken()
+    {
+        var result = ToolExecutor.InjectTokenInGitUrl("https://github.com/owner/repo.git", "my-token");
+        Assert.Equal("https://x-access-token:my-token@github.com/owner/repo.git", result);
+    }
+
+    [Fact]
+    public void InjectTokenInGitUrl_DoesNotDoubleInject()
+    {
+        var url = "https://x-access-token:existing@github.com/owner/repo.git";
+        Assert.Equal(url, ToolExecutor.InjectTokenInGitUrl(url, "new-token"));
+    }
+
+    [Fact]
+    public void InjectTokenInGitUrl_SshUrl_Unchanged()
+    {
+        var url = "git@github.com:owner/repo.git";
+        Assert.Equal(url, ToolExecutor.InjectTokenInGitUrl(url, "token"));
+    }
+
+    // ───────────────────────────── git: clone validation ──────────────
+
+    [Fact]
+    public async Task GitClone_MissingRepoUrl_Fails()
+    {
+        var result = await ExecuteGitCommand("git_clone",
+            "git clone -b {{branch}} {{repo_url}} {{destination}}",
+            new() { ["branch"] = "main" });
+
+        Assert.False(result.Success);
+        Assert.Contains("repo_url", result.Errors[0]);
+    }
+
+    [Fact]
+    public async Task GitClone_DestinationExists_Fails()
+    {
+        var dest = Path.Combine(_tempWorkspace, "repos", "existing-repo");
+        Directory.CreateDirectory(dest);
+
+        var result = await ExecuteGitCommand("git_clone",
+            "git clone -b {{branch}} {{repo_url}} {{destination}}",
+            new()
+            {
+                ["repo_url"] = "https://github.com/owner/existing-repo.git",
+                ["branch"] = "main",
+                ["destination"] = "existing-repo"
+            });
+
+        Assert.False(result.Success);
+        Assert.Contains("already exists", result.Errors[0]);
+    }
+
+    [Fact]
+    public async Task GitClone_DefaultsDestinationFromUrl()
+    {
+        // Use echo to see the resolved destination instead of real git clone
+        var result = await ExecuteGitCommand("git_clone",
+            OperatingSystem.IsWindows()
+                ? "echo {{destination}}"
+                : "echo '{{destination}}'",
+            new()
+            {
+                ["repo_url"] = "https://github.com/owner/my-repo.git",
+                ["branch"] = "main"
+            });
+
+        var expectedDest = Path.Combine(_tempWorkspace, "repos", "my-repo");
+        Assert.Contains(expectedDest, result.Output["stdout"]?.ToString() ?? "");
+    }
+
+    [Fact]
+    public async Task GitClone_DefaultsBranchToMain()
+    {
+        var result = await ExecuteGitCommand("git_clone",
+            OperatingSystem.IsWindows()
+                ? "echo {{branch}}"
+                : "echo '{{branch}}'",
+            new()
+            {
+                ["repo_url"] = "https://github.com/owner/test-repo.git"
+            });
+
+        Assert.Contains("main", result.Output["stdout"]?.ToString() ?? "");
+    }
+
+    // ───────────────────────────── git: commit validation ─────────────
+
+    [Fact]
+    public async Task GitCommit_MissingMessage_Fails()
+    {
+        var result = await ExecuteGitCommand("git_commit",
+            "git add . && git commit -m '{{message}}'",
+            new() { ["working_directory"] = _tempWorkspace });
+
+        Assert.False(result.Success);
+        Assert.Contains("message", result.Errors[0]);
+    }
+
+    [Fact]
+    public async Task GitCommit_EmptyMessage_Fails()
+    {
+        var result = await ExecuteGitCommand("git_commit",
+            "git add . && git commit -m '{{message}}'",
+            new() { ["message"] = "   ", ["working_directory"] = _tempWorkspace });
+
+        Assert.False(result.Success);
+        Assert.Contains("message", result.Errors[0]);
+    }
+
+    // ───────────────────────────── git: create_pull_request ───────────
+
+    [Fact]
+    public async Task CreatePullRequest_MissingToken_Fails()
+    {
+        // Create executor WITHOUT a GitHub token
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Workspace:BasePath"] = _tempWorkspace,
+                ["GitHub:Token"] = "",
+                ["GitHub:ApiUrl"] = "https://api.github.com"
+            })
+            .Build();
+
+        var executor = new ToolExecutor(
+            new FakeHttpClientFactory(),
+            config,
+            new NullLogger<ToolExecutor>());
+
+        var tool = new ToolDefinition
+        {
+            Name = "create_pull_request",
+            ExecutionType = "api",
+            Api = new ApiDefinition
+            {
+                Provider = "github",
+                Endpoint = "/repos/{{owner}}/{{repo}}/pulls",
+                Method = "POST",
+                Headers = new()
+                {
+                    ["Authorization"] = "Bearer {{secrets.github_token}}",
+                    ["Accept"] = "application/vnd.github+json"
+                },
+                Body = new()
+                {
+                    ["title"] = "{{title}}",
+                    ["body"] = "{{description}}",
+                    ["head"] = "{{branch}}",
+                    ["base"] = "{{base_branch}}"
+                }
+            }
+        };
+
+        var request = new ToolExecutionRequest
+        {
+            Tool = tool,
+            Inputs = new()
+            {
+                ["title"] = "Test PR",
+                ["description"] = "Test description",
+                ["branch"] = "feature/test",
+                ["base_branch"] = "main",
+                ["owner"] = "owner",
+                ["repo"] = "repo"
+            }
+        };
+
+        var result = await executor.ExecuteAsync(request, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Contains("GitHub token is not configured", result.Errors[0]);
+    }
+
+    // ───────────────────────────── git: integration ───────────────────
+
+    [Fact]
+    public async Task GitWorkflow_CloneBranchCommitPush_LocalRepo()
+    {
+        // 1. Create a bare repo (acts as remote)
+        var bareRepoPath = Path.Combine(_tempWorkspace, "bare-repo.git");
+        await RunGit($"init --bare \"{bareRepoPath}\"", _tempWorkspace);
+
+        // 2. Initialize a seed repo with a commit
+        var seedPath = Path.Combine(_tempWorkspace, "seed-repo");
+        Directory.CreateDirectory(seedPath);
+        await RunGit("init -b main", seedPath);
+        await RunGit("config user.email test@test.com", seedPath);
+        await RunGit("config user.name Test", seedPath);
+        File.WriteAllText(Path.Combine(seedPath, "README.md"), "# Test Repo");
+        await RunGit("add .", seedPath);
+        await RunGit("commit -m \"Initial commit\"", seedPath);
+        await RunGit($"remote add origin \"{bareRepoPath}\"", seedPath);
+        await RunGit("push origin main", seedPath);
+
+        // 3. Clone using our ToolExecutor (local path, no token injection)
+        var cloneDest = Path.Combine(_tempWorkspace, "repos", "cloned-repo");
+        var cloneResult = await ExecuteGitCommand("git_clone",
+            "git clone -b {{branch}} {{repo_url}} {{destination}}",
+            new()
+            {
+                ["repo_url"] = bareRepoPath,
+                ["branch"] = "main",
+                ["destination"] = cloneDest
+            });
+
+        Assert.True(cloneResult.Success, $"Clone failed: {string.Join("; ", cloneResult.Errors)}");
+        Assert.True(Directory.Exists(cloneDest));
+        Assert.Equal(cloneDest, cloneResult.Output["local_path"]?.ToString());
+
+        // Configure git user for the cloned repo
+        await RunGit("config user.email test@test.com", cloneDest);
+        await RunGit("config user.name Test", cloneDest);
+
+        // 4. Create branch
+        var branchResult = await ExecuteGitCommand("git_branch",
+            "git checkout -b {{branch_name}} {{base_branch}}",
+            new()
+            {
+                ["branch_name"] = "feature/test",
+                ["base_branch"] = "main",
+                ["working_directory"] = cloneDest
+            });
+
+        Assert.True(branchResult.Success, $"Branch failed: {string.Join("; ", branchResult.Errors)}");
+
+        // 5. Create a file, add and commit
+        File.WriteAllText(Path.Combine(cloneDest, "new-file.txt"), "Hello World");
+        var commitResult = await ExecuteGitCommand("git_commit",
+            "git add . && git commit -m '{{message}}'",
+            new()
+            {
+                ["message"] = "Add new file",
+                ["working_directory"] = cloneDest
+            });
+
+        Assert.True(commitResult.Success, $"Commit failed: {string.Join("; ", commitResult.Errors)}");
+
+        // 6. Push
+        var pushResult = await ExecuteGitCommand("git_push",
+            "git push origin {{branch_name}}",
+            new()
+            {
+                ["branch_name"] = "feature/test",
+                ["working_directory"] = cloneDest
+            });
+
+        Assert.True(pushResult.Success, $"Push failed: {string.Join("; ", pushResult.Errors)}");
+    }
+
     // ───────────────────────────── helpers ─────────────────────────────
 
     private Task<ToolResult> Execute(string toolName, string executionType,
@@ -433,6 +706,48 @@ public class ToolExecutorTests : IDisposable
         };
 
         return _executor.ExecuteAsync(request, CancellationToken.None);
+    }
+
+    private Task<ToolResult> ExecuteGitCommand(string toolName, string commandTemplate,
+        Dictionary<string, string> inputs)
+    {
+        var tool = new ToolDefinition
+        {
+            Name = toolName,
+            ExecutionType = "command",
+            Command = commandTemplate
+        };
+
+        var request = new ToolExecutionRequest
+        {
+            Tool = tool,
+            Inputs = inputs,
+            WorkingDirectory = _tempWorkspace
+        };
+
+        return _executor.ExecuteAsync(request, CancellationToken.None);
+    }
+
+    private static async Task RunGit(string args, string workDir)
+    {
+        var psi = new ProcessStartInfo("git", args)
+        {
+            WorkingDirectory = workDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        using var process = new Process { StartInfo = psi };
+        process.Start();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode != 0)
+        {
+            var stderr = await process.StandardError.ReadToEndAsync();
+            throw new InvalidOperationException($"git {args} failed (exit {process.ExitCode}): {stderr}");
+        }
     }
 
     private class FakeHttpClientFactory : IHttpClientFactory

@@ -156,12 +156,12 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 3.1 Git Operations
 
-- [ ] ToolExecutor: `git_clone` — clonar repositório para `workspace/repos/`
-- [ ] ToolExecutor: `git_branch` — criar branch no repositório clonado
-- [ ] ToolExecutor: `git_commit` — add + commit com mensagem
-- [ ] ToolExecutor: `git_push` — push para remote
-- [ ] ToolExecutor: `create_pull_request` — chamada à GitHub API para criar PR
-- [ ] Validar que token GitHub é lido de `appsettings.json` e injetado nos headers
+- [x] ToolExecutor: `git_clone` — clonar repositório para `workspace/repos/`
+- [x] ToolExecutor: `git_branch` — criar branch no repositório clonado
+- [x] ToolExecutor: `git_commit` — add + commit com mensagem
+- [x] ToolExecutor: `git_push` — push para remote
+- [x] ToolExecutor: `create_pull_request` — chamada à GitHub API para criar PR
+- [x] Validar que token GitHub é lido de `appsettings.json` e injetado nos headers
 
 ### 3.2 Build e Testes por stack
 
