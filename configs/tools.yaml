@@ -215,28 +215,6 @@ tools:
     command: "mvn install"
 
   # ===============================
-  # 🔍 CODE ANALYSIS
-  # ===============================
-
-  - name: read_files
-    category: analysis
-    description: Lê arquivos do projeto
-    input:
-      path: string
-    execution_type: internal
-    output:
-      content: string
-
-  - name: list_directory
-    category: analysis
-    description: Lista arquivos e diretórios
-    input:
-      path: string
-    execution_type: internal
-    output:
-      files: array
-
-  # ===============================
   # ✏️ FILE OPERATIONS
   # ===============================
 

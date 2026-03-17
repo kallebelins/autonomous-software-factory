@@ -17,6 +17,7 @@ Solução simples em .NET que:
 autonomous-software-factory/
 │
 ├── README.md
+├── project-structure.md
 ├── .gitignore
 ├── AutonomousSoftwareFactory.sln
 ├── appsettings.json

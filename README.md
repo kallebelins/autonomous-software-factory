@@ -88,7 +88,7 @@ Detalhamento completo em [project-structure.md](project-structure.md).
 
 ```bash
 # Clonar o projeto
-git clone https://github.com/kallebelins/yaml-agents-orchestrator.git
+git clone https://github.com/kallebelins/autonomous-software-factory.git
 cd autonomous-software-factory
 
 # Executar
