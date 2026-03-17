@@ -191,11 +191,11 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 4.1 Execução end-to-end
 
-- [ ] Executar pipeline completo com `samples/requirement-sample.json` + `samples/project-metadata-sample.json`
-- [ ] Validar que todos os 16 steps executam na sequência correta
-- [ ] Validar que outputs de cada step ficam disponíveis para o próximo
-- [ ] Validar que retry funciona em steps com on_failure
-- [ ] Validar que o PR é criado no GitHub (ou simular com mock)
+- [x] Executar pipeline completo com `samples/requirement-sample.json` + `samples/project-metadata-sample.json`
+- [x] Validar que todos os 16 steps executam na sequência correta
+- [x] Validar que outputs de cada step ficam disponíveis para o próximo
+- [x] Validar que retry funciona em steps com on_failure
+- [x] Validar que o PR é criado no GitHub (ou simular com mock)
 
 ### 4.2 Checkpoints e recuperação
 
