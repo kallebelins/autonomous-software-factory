@@ -84,16 +84,80 @@ Detalhamento completo em [project-structure.md](project-structure.md).
 
 ---
 
-## Como rodar (futuro)
+## Como rodar
+
+### Pré-requisitos
+
+* [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+* Git
+
+### Setup
 
 ```bash
 # Clonar o projeto
 git clone https://github.com/kallebelins/autonomous-software-factory.git
 cd autonomous-software-factory
 
-# Executar
+# Executar setup (cria pastas de trabalho e restaura pacotes NuGet)
+./scripts/setup-env.ps1
+```
+
+### Configuração
+
+Editar `appsettings.json` com as credenciais necessárias:
+
+```json
+{
+  "Llm": {
+    "Provider": "OpenAI",
+    "Model": "gpt-4.1",
+    "ApiKey": "<SUA_API_KEY>"
+  },
+  "GitHub": {
+    "Token": "<SEU_GITHUB_TOKEN>"
+  }
+}
+```
+
+### Executar o pipeline
+
+```bash
+# Via script (valida build antes de executar)
+./scripts/run-local.ps1 -Requirement ./samples/requirement-sample.json
+
+# Via dotnet run
 dotnet run --project src/AutonomousSoftwareFactory -- --requirement ./samples/requirement-sample.json
 ```
+
+### Retomar execução a partir de checkpoint
+
+Se o pipeline falhar em algum step, um checkpoint é salvo automaticamente em `workspace/checkpoints/`. Para retomar:
+
+```bash
+dotnet run --project src/AutonomousSoftwareFactory -- --resume ./workspace/checkpoints/AutonomousSoftwareFactoryWorkflow-checkpoint.json
+```
+
+### Executar testes
+
+```bash
+dotnet test
+```
+
+### Saída
+
+O pipeline exibe um resultado estruturado ao final:
+
+```
+=== Execution Result ===
+Status:   completed
+Duration: 00:02:15.3400000
+Log:      ./logs/20260317-141133-AutonomousSoftwareFactoryWorkflow.log
+Outputs:
+  final_status: success
+  pr_result: { ... }
+```
+
+Logs detalhados são gerados em `logs/` com rastreabilidade por step, chamadas LLM e execuções de tools.
 
 ---
 

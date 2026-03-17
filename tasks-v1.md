@@ -211,11 +211,11 @@ Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
 ### 4.4 Validação final
 
-- [ ] `dotnet build` sem warnings
-- [ ] `dotnet test` com todos os testes passando
-- [ ] Pipeline executa do início ao fim com saída estruturada
-- [ ] README.md atualizado com instruções de execução reais
-- [ ] Logs gerados em `logs/` com rastreabilidade completa
+- [x] `dotnet build` sem warnings
+- [x] `dotnet test` com todos os testes passando
+- [x] Pipeline executa do início ao fim com saída estruturada
+- [x] README.md atualizado com instruções de execução reais
+- [x] Logs gerados em `logs/` com rastreabilidade completa
 
 ---
 
