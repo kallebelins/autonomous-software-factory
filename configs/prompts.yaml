@@ -1,0 +1,87 @@
+version: 1.0
+
+prompts:
+
+  system:
+    description: Prompt base aplicado a todos os agentes.
+    template: |
+      Você é um agente especializado dentro de uma fábrica de software autônoma.
+      Seu papel é executar a tarefa atribuída com precisão e qualidade.
+      Sempre responda em formato estruturado (JSON quando possível).
+      Não invente informações. Baseie-se apenas nos dados fornecidos.
+
+  context_injection:
+    description: Template para injetar contexto do projeto no prompt do agente.
+    template: |
+      ## Contexto do Projeto
+      - Stack: {{project_context.stack}}
+      - Linguagem: {{project_context.language}}
+      - Arquitetura: {{project_context.architecture}}
+
+      ## Codebase
+      {{codebase_summary}}
+
+  output_format:
+    description: Instrução padrão de formato de saída.
+    template: |
+      Responda em JSON válido com a seguinte estrutura:
+      {
+        "status": "success" | "error",
+        "data": { ... },
+        "message": "descrição do resultado"
+      }
+
+  feature_template:
+    description: Template para geração de features no backlog.
+    template: |
+      Para cada funcionalidade, gere:
+      {
+        "title": "nome da feature",
+        "description": "descrição funcional",
+        "priority": "high" | "medium" | "low",
+        "acceptance_criteria": ["critério 1", "critério 2"]
+      }
+
+  microtask_template:
+    description: Template para geração de microtarefas.
+    template: |
+      Para cada microtarefa, gere:
+      {
+        "title": "nome da tarefa",
+        "description": "o que deve ser feito",
+        "type": "implementation" | "test" | "config",
+        "files": ["arquivo1.cs", "arquivo2.cs"],
+        "depends_on": []
+      }
+
+  spec_template:
+    description: Template para geração de specifications.
+    template: |
+      Para cada specification, gere:
+      {
+        "title": "nome",
+        "plan": "descrição do plano de execução",
+        "tasks": [
+          {
+            "file": "caminho/do/arquivo",
+            "action": "create" | "modify",
+            "description": "o que fazer no arquivo"
+          }
+        ],
+        "technical_notes": "observações técnicas"
+      }
+
+  pr_template:
+    description: Template para descrição do Pull Request.
+    template: |
+      ## O que foi feito
+      {{implementation_summary}}
+
+      ## Como testar
+      {{test_instructions}}
+
+      ## Checklist
+      - [ ] Build passando
+      - [ ] Testes passando
+      - [ ] Lint sem erros
+      - [ ] Code review aprovado

@@ -1,0 +1,279 @@
+version: 1.0
+
+workflow:
+  name: AutonomousSoftwareFactoryWorkflow
+  description: >
+    Workflow de desenvolvimento autônomo orientado por agentes.
+    Recebe um requisito, analisa o projeto existente, gera backlog,
+    microtarefas, specifications, implementa, valida e cria Pull Request.
+
+  execution:
+    mode: sequential
+    continue_on_error: false
+    persist_state: true
+    enable_checkpoints: true
+
+  context:
+    inputs:
+      - requirement
+      - repository
+      - project_metadata
+      - execution_settings
+
+    shared_state:
+      - project_context
+      - codebase_path
+      - codebase_summary
+      - features
+      - microtasks
+      - specifications
+      - validated_specifications
+      - environment_ready
+      - implementation_result
+      - build_result
+      - test_results
+      - quality_report
+      - review_status
+      - pr_result
+      - final_status
+
+  policies:
+    retry:
+      max_attempts: 2
+      strategy: simple
+    validation:
+      require_non_empty_outputs: true
+      stop_on_critical_failure: true
+    security:
+      allow_git_write: true
+      allow_dependency_installation: true
+      allow_build_execution: true
+      allow_test_execution: true
+      allow_pull_request_creation: true
+
+  steps:
+
+    - id: receive_requirement
+      name: Receive Requirement
+      type: input
+      description: Recebe e valida os dados mínimos de entrada do fluxo.
+      input:
+        requirement: "{{context.inputs.requirement}}"
+        repository: "{{context.inputs.repository}}"
+        project_metadata: "{{context.inputs.project_metadata}}"
+        execution_settings: "{{context.inputs.execution_settings}}"
+      output:
+        validated_requirement: requirement
+      validations:
+        - field: requirement
+          rule: required
+        - field: repository
+          rule: required
+      next: analyze_project
+
+    - id: analyze_project
+      name: Analyze Project
+      type: agent
+      agent: ProjectAnalyzerAgent
+      description: Identifica stack, linguagem, arquitetura e contexto inicial.
+      input:
+        requirement: "{{steps.receive_requirement.output.validated_requirement}}"
+        repository: "{{context.inputs.repository}}"
+        project_metadata: "{{context.inputs.project_metadata}}"
+      output:
+        project_context: project_context
+      next: load_codebase
+
+    - id: load_codebase
+      name: Load Codebase
+      type: agent
+      agent: CodebaseLoaderAgent
+      description: Clona o repositório e prepara a área de trabalho.
+      input:
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        codebase_path: codebase_path
+      next: analyze_codebase
+
+    - id: analyze_codebase
+      name: Analyze Codebase
+      type: agent
+      agent: CodebaseAnalyzerAgent
+      description: Analisa a estrutura do projeto e gera resumo técnico.
+      input:
+        codebase_path: "{{steps.load_codebase.output.codebase_path}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        codebase_summary: codebase_summary
+      next: generate_backlog
+
+    - id: generate_backlog
+      name: Generate Backlog
+      type: agent
+      agent: BacklogAgent
+      description: Gera lista de funcionalidades com base no requisito e no codebase.
+      input:
+        requirement: "{{steps.receive_requirement.output.validated_requirement}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+        codebase_summary: "{{steps.analyze_codebase.output.codebase_summary}}"
+      output:
+        features: features
+      next: breakdown_tasks
+
+    - id: breakdown_tasks
+      name: Breakdown Tasks
+      type: agent
+      agent: TaskBreakdownAgent
+      description: Quebra as funcionalidades em microtarefas.
+      input:
+        features: "{{steps.generate_backlog.output.features}}"
+        codebase_summary: "{{steps.analyze_codebase.output.codebase_summary}}"
+      output:
+        microtasks: microtasks
+      next: generate_specs
+
+    - id: generate_specs
+      name: Generate Specifications
+      type: agent
+      agent: SpecAgent
+      description: Gera spec, plan e tasks com base nas microtarefas.
+      input:
+        requirement: "{{steps.receive_requirement.output.validated_requirement}}"
+        features: "{{steps.generate_backlog.output.features}}"
+        microtasks: "{{steps.breakdown_tasks.output.microtasks}}"
+        codebase_summary: "{{steps.analyze_codebase.output.codebase_summary}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        specifications: specifications
+      next: validate_architecture
+
+    - id: validate_architecture
+      name: Validate Architecture
+      type: agent
+      agent: ArchitectureValidatorAgent
+      description: Valida aderência das specifications à arquitetura existente.
+      input:
+        specifications: "{{steps.generate_specs.output.specifications}}"
+        codebase_summary: "{{steps.analyze_codebase.output.codebase_summary}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        validated_specifications: validated_specifications
+      next: setup_environment
+
+    - id: setup_environment
+      name: Setup Environment
+      type: agent
+      agent: EnvironmentSetupAgent
+      description: Prepara o ambiente conforme a stack detectada.
+      input:
+        project_context: "{{steps.analyze_project.output.project_context}}"
+        codebase_path: "{{steps.load_codebase.output.codebase_path}}"
+        execution_settings: "{{context.inputs.execution_settings}}"
+      output:
+        environment_ready: environment_ready
+      next: implement_code
+
+    - id: implement_code
+      name: Implement Code
+      type: agent
+      agent: DeveloperAgent
+      description: Implementa o código a partir das specifications validadas.
+      input:
+        validated_specifications: "{{steps.validate_architecture.output.validated_specifications}}"
+        codebase_path: "{{steps.load_codebase.output.codebase_path}}"
+        codebase_summary: "{{steps.analyze_codebase.output.codebase_summary}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        implementation_result: implementation_result
+      next: execute_build
+
+    - id: execute_build
+      name: Execute Build
+      type: agent
+      agent: BuildAgent
+      description: Executa a compilação/build do projeto.
+      input:
+        codebase_path: "{{steps.load_codebase.output.codebase_path}}"
+        implementation_result: "{{steps.implement_code.output.implementation_result}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        build_result: build_result
+      next: execute_tests
+
+    - id: execute_tests
+      name: Execute Tests
+      type: agent
+      agent: TestAgent
+      description: Executa os testes automatizados do projeto.
+      input:
+        codebase_path: "{{steps.load_codebase.output.codebase_path}}"
+        build_result: "{{steps.execute_build.output.build_result}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        test_results: test_results
+      next: validate_quality
+
+    - id: validate_quality
+      name: Validate Quality
+      type: agent
+      agent: QualityAgent
+      description: Executa lint, análise estática e validações de qualidade.
+      input:
+        codebase_path: "{{steps.load_codebase.output.codebase_path}}"
+        build_result: "{{steps.execute_build.output.build_result}}"
+        test_results: "{{steps.execute_tests.output.test_results}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+      output:
+        quality_report: quality_report
+      next: review_delivery
+
+    - id: review_delivery
+      name: Review Delivery
+      type: agent
+      agent: ReviewAgent
+      description: Faz a revisão final antes da criação do Pull Request.
+      input:
+        validated_specifications: "{{steps.validate_architecture.output.validated_specifications}}"
+        implementation_result: "{{steps.implement_code.output.implementation_result}}"
+        build_result: "{{steps.execute_build.output.build_result}}"
+        test_results: "{{steps.execute_tests.output.test_results}}"
+        quality_report: "{{steps.validate_quality.output.quality_report}}"
+      output:
+        review_status: review_status
+      next: create_pull_request
+
+    - id: create_pull_request
+      name: Create Pull Request
+      type: agent
+      agent: PullRequestAgent
+      description: Cria branch, commit, push e Pull Request.
+      input:
+        review_status: "{{steps.review_delivery.output.review_status}}"
+        codebase_path: "{{steps.load_codebase.output.codebase_path}}"
+        project_context: "{{steps.analyze_project.output.project_context}}"
+        requirement: "{{steps.receive_requirement.output.validated_requirement}}"
+      output:
+        pr_result: pr_result
+      next: finalize_workflow
+
+    - id: finalize_workflow
+      name: Finalize Workflow
+      type: output
+      description: Consolida o resultado final da execução.
+      input:
+        project_context: "{{steps.analyze_project.output.project_context}}"
+        codebase_summary: "{{steps.analyze_codebase.output.codebase_summary}}"
+        features: "{{steps.generate_backlog.output.features}}"
+        microtasks: "{{steps.breakdown_tasks.output.microtasks}}"
+        specifications: "{{steps.generate_specs.output.specifications}}"
+        validated_specifications: "{{steps.validate_architecture.output.validated_specifications}}"
+        build_result: "{{steps.execute_build.output.build_result}}"
+        test_results: "{{steps.execute_tests.output.test_results}}"
+        quality_report: "{{steps.validate_quality.output.quality_report}}"
+        review_status: "{{steps.review_delivery.output.review_status}}"
+        pr_result: "{{steps.create_pull_request.output.pr_result}}"
+      output:
+        final_status:
+          workflow: completed
+          pull_request_created: true
+          pr_result: "{{steps.create_pull_request.output.pr_result}}"

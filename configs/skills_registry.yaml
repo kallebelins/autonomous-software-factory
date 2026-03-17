@@ -1,0 +1,192 @@
+version: 1.0
+
+skills:
+
+  # ===============================
+  # 🧠 COGNITIVAS (LLM Behavior)
+  # ===============================
+
+  - name: decision_making
+    type: cognitive
+    description: Capacidade de tomar decisões com base em contexto, regras e resultados anteriores.
+    instructions: |
+      Sempre avalie múltiplas opções antes de decidir.
+      Priorize segurança, consistência e continuidade do fluxo.
+    expected_input:
+      - context
+      - options
+    expected_output:
+      - chosen_action
+    constraints:
+      - Nunca decidir aleatoriamente
+      - Sempre justificar decisão
+
+  - name: planning
+    type: cognitive
+    description: Capacidade de criar planos estruturados para execução de tarefas.
+    instructions: |
+      Organize tarefas em ordem lógica.
+      Considere dependências e impactos.
+    expected_input:
+      - requirement
+      - context
+    expected_output:
+      - execution_plan
+    constraints:
+      - Evitar planos vagos
+      - Garantir sequência lógica
+
+  - name: code_analysis
+    type: cognitive
+    description: Capacidade de analisar código fonte e entender sua estrutura e comportamento.
+    instructions: |
+      Identifique arquitetura, módulos, dependências e padrões.
+    expected_input:
+      - codebase
+    expected_output:
+      - code_summary
+    constraints:
+      - Não inventar estruturas inexistentes
+      - Basear análise apenas no código real
+
+  - name: architecture_review
+    type: cognitive
+    description: Capacidade de validar se uma solução está aderente à arquitetura existente.
+    instructions: |
+      Compare a solução proposta com o padrão do projeto.
+    expected_input:
+      - specifications
+      - codebase_summary
+    expected_output:
+      - validation_result
+    constraints:
+      - Não propor mudanças drásticas sem justificativa
+
+  - name: decomposition
+    type: cognitive
+    description: Capacidade de dividir funcionalidades em microtarefas.
+    instructions: |
+      Quebre em tarefas pequenas, independentes e executáveis.
+    expected_input:
+      - features
+    expected_output:
+      - microtasks
+    constraints:
+      - Evitar tarefas genéricas
+
+  - name: product_thinking
+    type: cognitive
+    description: Capacidade de transformar requisitos em funcionalidades de valor.
+    instructions: |
+      Foque em valor de negócio e usabilidade.
+    expected_input:
+      - requirement
+    expected_output:
+      - features
+    constraints:
+      - Evitar soluções técnicas sem valor de negócio
+
+  - name: coding
+    type: cognitive
+    description: Capacidade de escrever código limpo, funcional e aderente ao padrão do projeto.
+    instructions: |
+      Respeite padrões existentes.
+      Escreva código legível e testável.
+    expected_input:
+      - specifications
+      - codebase
+    expected_output:
+      - source_code
+    constraints:
+      - Não sobrescrever código existente sem necessidade
+
+  - name: testing
+    type: cognitive
+    description: Capacidade de validar comportamento do sistema por meio de testes.
+    instructions: |
+      Crie e execute testes que validem regras de negócio.
+    expected_input:
+      - code
+    expected_output:
+      - test_results
+    constraints:
+      - Garantir cobertura mínima
+
+  - name: code_review
+    type: cognitive
+    description: Capacidade de revisar código e identificar problemas.
+    instructions: |
+      Avalie qualidade, segurança e aderência ao padrão.
+    expected_input:
+      - code
+      - test_results
+    expected_output:
+      - review_feedback
+    constraints:
+      - Não aprovar código com falhas críticas
+
+  - name: code_quality
+    type: cognitive
+    description: Capacidade de avaliar qualidade do código.
+    instructions: |
+      Verifique legibilidade, complexidade e boas práticas.
+    expected_input:
+      - code
+    expected_output:
+      - quality_report
+    constraints:
+      - Não ignorar problemas estruturais
+
+  # ===============================
+  # ⚙️ OPERACIONAIS (TOOLS)
+  # ===============================
+
+  - name: git_operations
+    type: operational
+    description: Execução de operações Git.
+    tools:
+      - git_clone
+      - git_branch
+      - git_commit
+      - git_push
+      - create_pull_request
+    instructions: |
+      Execute operações Git de forma segura e rastreável.
+    constraints:
+      - Nunca sobrescrever branch principal diretamente
+
+  - name: build_execution
+    type: operational
+    description: Execução de build do projeto.
+    tools:
+      - dotnet_build
+      - maven_build
+      - npm_build
+    instructions: |
+      Compile o projeto conforme a stack.
+    constraints:
+      - Parar execução em caso de erro
+
+  - name: test_execution
+    type: operational
+    description: Execução de testes automatizados.
+    tools:
+      - dotnet_test
+      - junit_test
+      - jest_test
+    instructions: |
+      Execute todos os testes disponíveis.
+    constraints:
+      - Não ignorar falhas
+
+  - name: dependency_installation
+    type: operational
+    description: Instalação de dependências do projeto.
+    tools:
+      - npm_install
+      - dotnet_restore
+      - maven_install
+    instructions: |
+      Instale dependências conforme o projeto.
+    constraints:
+      - Validar sucesso da instalação

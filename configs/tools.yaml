@@ -1,0 +1,168 @@
+version: 1.0
+
+tools:
+
+  # ===============================
+  # 📦 GIT OPERATIONS
+  # ===============================
+
+  - name: git_clone
+    category: git
+    description: Clona um repositório Git para um diretório local.
+    input:
+      repo_url: string
+      branch: string
+      destination: string
+    output:
+      local_path: string
+    command: "git clone -b {{branch}} {{repo_url}} {{destination}}"
+    constraints:
+      - Deve validar se o diretório já existe
+      - Deve falhar se o clone não for concluído
+
+  - name: git_branch
+    category: git
+    description: Cria uma nova branch.
+    input:
+      branch_name: string
+      base_branch: string
+    command: "git checkout -b {{branch_name}} {{base_branch}}"
+    constraints:
+      - Não sobrescrever branch existente
+
+  - name: git_commit
+    category: git
+    description: Realiza commit das alterações.
+    input:
+      message: string
+    command: "git add . && git commit -m '{{message}}'"
+    constraints:
+      - Não permitir commit vazio
+
+  - name: git_push
+    category: git
+    description: Envia alterações para o repositório remoto.
+    input:
+      branch_name: string
+    command: "git push origin {{branch_name}}"
+
+  - name: create_pull_request
+    category: git
+    description: Cria um Pull Request no GitHub.
+    input:
+      title: string
+      description: string
+      branch: string
+    execution_type: api
+    api:
+      provider: github
+      endpoint: "/repos/{owner}/{repo}/pulls"
+      method: POST
+    constraints:
+      - Deve incluir descrição clara do PR
+
+  # ===============================
+  # 🧱 BUILD EXECUTION
+  # ===============================
+
+  - name: dotnet_build
+    category: build
+    description: Compila projeto .NET
+    command: "dotnet build"
+    constraints:
+      - Falhar se houver erro de compilação
+
+  - name: maven_build
+    category: build
+    description: Compila projeto Java com Maven
+    command: "mvn clean install"
+    constraints:
+      - Parar execução em caso de erro
+
+  - name: npm_build
+    category: build
+    description: Compila projeto frontend
+    command: "npm run build"
+    constraints:
+      - Validar sucesso do build
+
+  # ===============================
+  # 🧪 TEST EXECUTION
+  # ===============================
+
+  - name: dotnet_test
+    category: test
+    description: Executa testes .NET
+    command: "dotnet test"
+    constraints:
+      - Não ignorar falhas
+
+  - name: junit_test
+    category: test
+    description: Executa testes Java
+    command: "mvn test"
+
+  - name: jest_test
+    category: test
+    description: Executa testes frontend
+    command: "npm test"
+
+  # ===============================
+  # 📦 DEPENDENCY INSTALL
+  # ===============================
+
+  - name: dotnet_restore
+    category: dependency
+    description: Restaura dependências .NET
+    command: "dotnet restore"
+
+  - name: npm_install
+    category: dependency
+    description: Instala dependências Node.js
+    command: "npm install"
+
+  - name: maven_install
+    category: dependency
+    description: Instala dependências Maven
+    command: "mvn install"
+
+  # ===============================
+  # 🔍 CODE ANALYSIS
+  # ===============================
+
+  - name: read_files
+    category: analysis
+    description: Lê arquivos do projeto
+    input:
+      path: string
+    execution_type: internal
+    output:
+      content: string
+
+  - name: list_directory
+    category: analysis
+    description: Lista arquivos e diretórios
+    input:
+      path: string
+    execution_type: internal
+    output:
+      files: array
+
+  # ===============================
+  # 🧹 QUALITY / LINT
+  # ===============================
+
+  - name: eslint
+    category: quality
+    description: Executa lint em projetos frontend
+    command: "npx eslint ."
+
+  - name: dotnet_format
+    category: quality
+    description: Valida formatação .NET
+    command: "dotnet format --verify-no-changes"
+
+  - name: checkstyle
+    category: quality
+    description: Valida padrão Java
+    command: "mvn checkstyle:check"

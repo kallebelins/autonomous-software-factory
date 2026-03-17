@@ -1,0 +1,15 @@
+{
+  "title": "Criar endpoint de cadastro de usuário",
+  "description": "Implementar API REST para cadastro de usuários com validação de email, senha forte e verificação de duplicidade. O endpoint deve retornar o usuário criado com status 201.",
+  "repository": {
+    "url": "https://github.com/owner/project-name",
+    "branch": "main"
+  },
+  "acceptance_criteria": [
+    "POST /api/users deve criar um novo usuário",
+    "Validar formato de email",
+    "Validar senha com mínimo 8 caracteres",
+    "Retornar 409 se email já existir",
+    "Retornar 201 com dados do usuário criado"
+  ]
+}

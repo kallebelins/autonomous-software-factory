@@ -1,0 +1,301 @@
+version: 1.0
+
+agents:
+
+  - name: SupervisorAgent
+    description: Orquestra todo o fluxo de execução do pipeline de desenvolvimento.
+    responsibilities:
+      - Receber requisito inicial
+      - Coordenar execução dos agentes
+      - Controlar fluxo e estados
+    input:
+      - requirement
+    output:
+      - final_status
+    skills:
+      - decision_making
+      - planning
+    tools: []
+    prompt: |
+      Você é o agente supervisor responsável por coordenar o fluxo completo de desenvolvimento.
+      Garanta que cada etapa seja executada corretamente e na ordem adequada.
+      Em caso de falha, registre e tente recuperação.
+
+  - name: ProjectAnalyzerAgent
+    description: Identifica stack, tipo de projeto e repositório.
+    responsibilities:
+      - Identificar linguagem e arquitetura
+      - Validar existência do repositório
+    input:
+      - requirement
+      - repository
+      - project_metadata
+    output:
+      - project_context
+    skills:
+      - code_analysis
+    tools:
+      - list_directory
+      - read_files
+    prompt: |
+      Analise o requisito e identifique:
+      - Tipo de projeto
+      - Linguagem principal
+      - Arquitetura esperada
+      - Stack tecnológica
+
+  - name: CodebaseLoaderAgent
+    description: Clona o repositório e prepara o ambiente.
+    responsibilities:
+      - Clonar código
+      - Preparar diretório de trabalho
+    input:
+      - project_context
+    output:
+      - codebase_path
+    skills:
+      - git_operations
+    tools:
+      - git_clone
+    prompt: |
+      Clone o repositório informado e prepare o ambiente local de trabalho.
+
+  - name: CodebaseAnalyzerAgent
+    description: Analisa o código existente.
+    responsibilities:
+      - Ler estrutura do projeto
+      - Identificar padrões e módulos
+    input:
+      - codebase_path
+      - project_context
+    output:
+      - codebase_summary
+    skills:
+      - code_analysis
+    tools:
+      - read_files
+      - list_directory
+    prompt: |
+      Analise o código do projeto e descreva:
+      - Arquitetura geral
+      - Principais módulos e camadas
+      - Dependências externas
+      - Padrões utilizados
+
+  - name: BacklogAgent
+    description: Gera lista de funcionalidades.
+    responsibilities:
+      - Criar backlog de features a partir do requisito
+    input:
+      - requirement
+      - project_context
+      - codebase_summary
+    output:
+      - features
+    skills:
+      - product_thinking
+    tools: []
+    prompt: |
+      Com base no requisito e no contexto do sistema existente, gere uma lista de funcionalidades.
+      Cada feature deve ter título, descrição e prioridade.
+
+  - name: TaskBreakdownAgent
+    description: Quebra features em microtarefas.
+    responsibilities:
+      - Criar microtarefas detalhadas e executáveis
+    input:
+      - features
+      - codebase_summary
+    output:
+      - microtasks
+    skills:
+      - decomposition
+    tools: []
+    prompt: |
+      Quebre cada funcionalidade em microtarefas técnicas e funcionais.
+      Cada tarefa deve ser pequena, independente e executável.
+
+  - name: SpecAgent
+    description: Gera specifications completas.
+    responsibilities:
+      - Criar plan, tasks e specs técnicas
+    input:
+      - requirement
+      - features
+      - microtasks
+      - codebase_summary
+      - project_context
+    output:
+      - specifications
+    skills:
+      - planning
+      - coding
+    tools: []
+    prompt: |
+      Gere specifications completas contendo:
+      - Plano de execução detalhado
+      - Tasks com arquivos, métodos e assinaturas
+      - Estratégia técnica por funcionalidade
+
+  - name: ArchitectureValidatorAgent
+    description: Valida aderência arquitetural.
+    responsibilities:
+      - Garantir alinhamento com arquitetura existente
+    input:
+      - specifications
+      - codebase_summary
+      - project_context
+    output:
+      - validated_specifications
+    skills:
+      - architecture_review
+    tools: []
+    prompt: |
+      Valide se as specifications estão alinhadas com a arquitetura do projeto.
+      Aponte inconsistências e sugira correções se necessário.
+
+  - name: EnvironmentSetupAgent
+    description: Prepara ambiente de execução conforme a stack.
+    responsibilities:
+      - Instalar dependências
+      - Configurar runtime
+    input:
+      - project_context
+      - codebase_path
+      - execution_settings
+    output:
+      - environment_ready
+    skills:
+      - dependency_installation
+    tools:
+      - dotnet_restore
+      - npm_install
+      - maven_install
+    prompt: |
+      Prepare o ambiente necessário para execução do projeto.
+      Instale dependências conforme a stack detectada.
+
+  - name: DeveloperAgent
+    description: Implementa o código.
+    responsibilities:
+      - Codificar funcionalidades conforme specifications
+    input:
+      - validated_specifications
+      - codebase_path
+      - codebase_summary
+      - project_context
+    output:
+      - implementation_result
+    skills:
+      - coding
+    tools:
+      - read_files
+      - list_directory
+    prompt: |
+      Implemente o código conforme specifications, respeitando padrões existentes.
+      Gere código limpo, testável e aderente à arquitetura.
+
+  - name: BuildAgent
+    description: Executa build do projeto.
+    responsibilities:
+      - Compilar projeto conforme a stack
+    input:
+      - codebase_path
+      - implementation_result
+      - project_context
+    output:
+      - build_result
+    skills:
+      - build_execution
+    tools:
+      - dotnet_build
+      - maven_build
+      - npm_build
+    prompt: |
+      Execute o build do projeto e reporte erros encontrados.
+
+  - name: TestAgent
+    description: Executa testes automatizados.
+    responsibilities:
+      - Rodar testes conforme a stack
+    input:
+      - codebase_path
+      - build_result
+      - project_context
+    output:
+      - test_results
+    skills:
+      - test_execution
+    tools:
+      - dotnet_test
+      - junit_test
+      - jest_test
+    prompt: |
+      Execute todos os testes automatizados e reporte falhas detalhadamente.
+
+  - name: QualityAgent
+    description: Valida qualidade do código.
+    responsibilities:
+      - Executar lint e análise estática
+    input:
+      - codebase_path
+      - build_result
+      - test_results
+      - project_context
+    output:
+      - quality_report
+    skills:
+      - code_quality
+    tools:
+      - eslint
+      - dotnet_format
+      - checkstyle
+    prompt: |
+      Execute análise de qualidade, lint e formatação.
+      Reporte problemas encontrados com severidade.
+
+  - name: ReviewAgent
+    description: Faz revisão final antes do PR.
+    responsibilities:
+      - Revisar código, testes e qualidade
+    input:
+      - validated_specifications
+      - implementation_result
+      - build_result
+      - test_results
+      - quality_report
+    output:
+      - review_status
+    skills:
+      - code_review
+    tools: []
+    prompt: |
+      Revise o código implementado considerando:
+      - Aderência às specifications
+      - Resultado do build e testes
+      - Relatório de qualidade
+      Valide se está pronto para entrega.
+
+  - name: PullRequestAgent
+    description: Cria branch, commit e Pull Request.
+    responsibilities:
+      - Criar branch
+      - Commit das alterações
+      - Push e criação do PR
+    input:
+      - review_status
+      - codebase_path
+      - project_context
+      - requirement
+    output:
+      - pr_result
+    skills:
+      - git_operations
+    tools:
+      - git_branch
+      - git_commit
+      - git_push
+      - create_pull_request
+    prompt: |
+      Crie uma branch descritiva, faça commit das alterações e crie um Pull Request.
+      A descrição do PR deve conter o que foi implementado e como testar.

@@ -1,0 +1,12 @@
+{
+  "name": "project-name",
+  "owner": "owner",
+  "repository_url": "https://github.com/owner/project-name",
+  "default_branch": "main",
+  "stack": "dotnet",
+  "language": "csharp",
+  "framework": "aspnet",
+  "architecture": "clean-architecture",
+  "test_framework": "xunit",
+  "package_manager": "nuget"
+}
