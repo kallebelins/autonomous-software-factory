@@ -8,73 +8,73 @@ Referência: [project-structure.md](project-structure.md)
 
 ### 1.1 Criar estrutura do projeto .NET
 
-- [ ] Criar solution `AutonomousSoftwareFactory.sln`
-- [ ] Criar projeto console `src/AutonomousSoftwareFactory/AutonomousSoftwareFactory.csproj` (.NET 8)
-- [ ] Adicionar pacotes NuGet: `YamlDotNet`, `Microsoft.Extensions.Configuration`, `Microsoft.Extensions.Configuration.Json`, `Microsoft.Extensions.DependencyInjection`
-- [ ] Criar projeto de testes `tests/AutonomousSoftwareFactory.Tests/AutonomousSoftwareFactory.Tests.csproj` (xUnit)
-- [ ] Validar que `dotnet build` compila sem erros
+- [x] Criar solution `AutonomousSoftwareFactory.sln`
+- [x] Criar projeto console `src/AutonomousSoftwareFactory/AutonomousSoftwareFactory.csproj` (.NET 8)
+- [x] Adicionar pacotes NuGet: `YamlDotNet`, `Microsoft.Extensions.Configuration`, `Microsoft.Extensions.Configuration.Json`, `Microsoft.Extensions.DependencyInjection`
+- [x] Criar projeto de testes `tests/AutonomousSoftwareFactory.Tests/AutonomousSoftwareFactory.Tests.csproj` (xUnit)
+- [x] Validar que `dotnet build` compila sem erros
 
 ### 1.2 Models — classes que mapeiam os YAMLs
 
 Cada classe mapeia a estrutura dos YAMLs em `configs/`.
 
-- [ ] `Models/WorkflowDefinition.cs` — mapeia `workflow.yaml` (name, description, execution, context, policies, steps)
-- [ ] `Models/StepDefinition.cs` — cada step do workflow (id, name, type, agent, input, output, next, retry, on_failure, validations)
-- [ ] `Models/AgentDefinition.cs` — cada agente do `agents.yaml` (name, description, status, responsibilities, input, output, skills, tools, prompt)
-- [ ] `Models/SkillDefinition.cs` — cada skill do `skills_registry.yaml` (name, type, description, instructions, expected_input, expected_output, constraints, tools)
-- [ ] `Models/ToolDefinition.cs` — cada tool do `tools.yaml` (name, category, description, execution_type, input, output, command, api, constraints)
-- [ ] `Models/PromptDefinition.cs` — cada prompt do `prompts.yaml` (chave, description, template)
-- [ ] `Models/ExecutionContext.cs` — estado compartilhado entre steps (inputs, shared_state, current_step)
-- [ ] `Models/ExecutionResult.cs` — resultado final da execução (status, outputs, errors, duration)
+- [x] `Models/WorkflowDefinition.cs` — mapeia `workflow.yaml` (name, description, execution, context, policies, steps)
+- [x] `Models/StepDefinition.cs` — cada step do workflow (id, name, type, agent, input, output, next, retry, on_failure, validations)
+- [x] `Models/AgentDefinition.cs` — cada agente do `agents.yaml` (name, description, status, responsibilities, input, output, skills, tools, prompt)
+- [x] `Models/SkillDefinition.cs` — cada skill do `skills_registry.yaml` (name, type, description, instructions, expected_input, expected_output, constraints, tools)
+- [x] `Models/ToolDefinition.cs` — cada tool do `tools.yaml` (name, category, description, execution_type, input, output, command, api, constraints)
+- [x] `Models/PromptDefinition.cs` — cada prompt do `prompts.yaml` (chave, description, template)
+- [x] `Models/ExecutionContext.cs` — estado compartilhado entre steps (inputs, shared_state, current_step)
+- [x] `Models/ExecutionResult.cs` — resultado final da execução (status, outputs, errors, duration)
 
 ### 1.3 Models — classes de execução
 
-- [ ] `Models/AgentExecutionRequest.cs` — dados de entrada para execução de um agente (agent, inputs, skills, tools, prompt, context)
-- [ ] `Models/AgentResult.cs` — resultado retornado pelo agente (status, data, message)
-- [ ] `Models/ToolExecutionRequest.cs` — dados de entrada para execução de uma tool (tool, inputs, working_directory)
-- [ ] `Models/ToolResult.cs` — resultado retornado pela tool (success, output, errors)
+- [x] `Models/AgentExecutionRequest.cs` — dados de entrada para execução de um agente (agent, inputs, skills, tools, prompt, context)
+- [x] `Models/AgentResult.cs` — resultado retornado pelo agente (status, data, message)
+- [x] `Models/ToolExecutionRequest.cs` — dados de entrada para execução de uma tool (tool, inputs, working_directory)
+- [x] `Models/ToolResult.cs` — resultado retornado pela tool (success, output, errors)
 
 ### 1.4 YamlConfigLoader
 
-- [ ] `Yaml/YamlConfigLoader.cs` — implementar `IYamlConfigLoader`
-  - [ ] `LoadWorkflow(string path)` → `WorkflowDefinition`
-  - [ ] `LoadAgents(string path)` → `List<AgentDefinition>`
-  - [ ] `LoadSkills(string path)` → `List<SkillDefinition>`
-  - [ ] `LoadTools(string path)` → `List<ToolDefinition>`
-  - [ ] `LoadPrompts(string path)` → `List<PromptDefinition>`
-- [ ] Testar deserialização com os YAMLs reais em `configs/`
+- [x] `Yaml/YamlConfigLoader.cs` — implementar `IYamlConfigLoader`
+  - [x] `LoadWorkflow(string path)` → `WorkflowDefinition`
+  - [x] `LoadAgents(string path)` → `List<AgentDefinition>`
+  - [x] `LoadSkills(string path)` → `List<SkillDefinition>`
+  - [x] `LoadTools(string path)` → `List<ToolDefinition>`
+  - [x] `LoadPrompts(string path)` → `List<PromptDefinition>`
+- [x] Testar deserialização com os YAMLs reais em `configs/`
 
 ### 1.5 State Store
 
-- [ ] `State/IStateStore.cs` — interface com `Set(key, value)`, `Get<T>(key)`, `Has(key)`
-- [ ] `State/InMemoryStateStore.cs` — implementação com `Dictionary<string, object>`
-- [ ] Testes unitários do InMemoryStateStore
+- [x] `State/IStateStore.cs` — interface com `Set(key, value)`, `Get<T>(key)`, `Has(key)`
+- [x] `State/InMemoryStateStore.cs` — implementação com `Dictionary<string, object>`
+- [x] Testes unitários do InMemoryStateStore
 
 ### 1.6 Workflow Engine
 
-- [ ] `Workflow/IWorkflowEngine.cs` — interface com `ExecuteAsync(ExecutionContext, CancellationToken)`
-- [ ] `Workflow/WorkflowEngine.cs` — implementação:
-  - [ ] Receber workflow, agents, skills, tools e prompts carregados
-  - [ ] Percorrer steps sequencialmente seguindo `next`
-  - [ ] Resolver step type `input` — validar campos obrigatórios e salvar no state
-  - [ ] Resolver step type `agent` — localizar agente pelo nome, montar request, chamar AgentExecutor
-  - [ ] Resolver step type `output` — consolidar resultado final
-  - [ ] Resolver inputs com template `{{steps.X.output.Y}}` e `{{context.inputs.Z}}`
-  - [ ] Salvar output de cada step no StateStore
-  - [ ] Aplicar política de retry por step (max_attempts, strategy)
-  - [ ] Aplicar on_failure (stop ou continue)
-  - [ ] Log por step (início, fim, status, erros)
+- [x] `Workflow/IWorkflowEngine.cs` — interface com `ExecuteAsync(ExecutionContext, CancellationToken)`
+- [x] `Workflow/WorkflowEngine.cs` — implementação:
+  - [x] Receber workflow, agents, skills, tools e prompts carregados
+  - [x] Percorrer steps sequencialmente seguindo `next`
+  - [x] Resolver step type `input` — validar campos obrigatórios e salvar no state
+  - [x] Resolver step type `agent` — localizar agente pelo nome, montar request, chamar AgentExecutor
+  - [x] Resolver step type `output` — consolidar resultado final
+  - [x] Resolver inputs com template `{{steps.X.output.Y}}` e `{{context.inputs.Z}}`
+  - [x] Salvar output de cada step no StateStore
+  - [x] Aplicar política de retry por step (max_attempts, strategy)
+  - [x] Aplicar on_failure (stop ou continue)
+  - [x] Log por step (início, fim, status, erros)
 
 ### 1.7 Program.cs + DI
 
-- [ ] `Program.cs` — entry point:
-  - [ ] Ler `appsettings.json` com `IConfiguration`
-  - [ ] Registrar serviços via DI (`IYamlConfigLoader`, `IStateStore`, `IWorkflowEngine`, `IAgentExecutor`, `IToolExecutor`, `ILlmClient`)
-  - [ ] Carregar YAMLs de `configs/`
-  - [ ] Ler argumento `--requirement` (caminho do JSON de requisito)
-  - [ ] Criar `ExecutionContext` com inputs
-  - [ ] Chamar `WorkflowEngine.ExecuteAsync`
-  - [ ] Exibir resultado final
+- [x] `Program.cs` — entry point:
+  - [x] Ler `appsettings.json` com `IConfiguration`
+  - [x] Registrar serviços via DI (`IYamlConfigLoader`, `IStateStore`, `IWorkflowEngine`, `IAgentExecutor`, `IToolExecutor`, `ILlmClient`)
+  - [x] Carregar YAMLs de `configs/`
+  - [x] Ler argumento `--requirement` (caminho do JSON de requisito)
+  - [x] Criar `ExecutionContext` com inputs
+  - [x] Chamar `WorkflowEngine.ExecuteAsync`
+  - [x] Exibir resultado final
 
 ### 1.8 Testes da Fase 1
 
